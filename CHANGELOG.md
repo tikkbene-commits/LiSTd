@@ -40,7 +40,20 @@ rather than reconstruct every past chat message.
   timed out; a later attempt succeeded. CLI analyses of the same two files also
   passed and their SHA-256 hashes were unchanged. Catalog and job JSON hashes were
   unchanged after GUI analysis; the existing 147-track library remains intact.
-- Standalone package validation is in progress. No new live downloads, global
+- A final concurrency check reproduced SIGSEGV with the original NumPy 2.0.2
+  runtime despite cache isolation. Kept the NumPy 1.26.4 pin: concurrent cold/warm
+  analysis of both real tracks and repeated GUI analysis passed. Added concurrent
+  generated-audio subprocess regression coverage; all 30 tests passed again in
+  30.49 seconds. An attempted smaller NumPy 2 package rebuild was stopped and is
+  not the delivery artifact. The stable archive is larger (300,186,557 bytes);
+  reduced background launches/work are the optimization, not archive size.
+- The stable universal 1.4.1 ZIP passed both architecture dependency/minimum-OS
+  audits and relocated/read-only clean-HOME sandbox pipelines: cold/warm analysis,
+  mock daemon/transfer/frozen callback, verification, sorting, relabel/index update
+  and state reload. The final ZIP passed CRC, embedded source/version comparison
+  and strict deep codesign verification after extraction. SHA-256 is recorded in
+  STANDALONE_QA.md. The source baseline and final version have Git tags.
+- No new live downloads, global
   Soulseek configuration changes or protected collection moves were performed.
   External audio devices, another physical Mac and notarization were not checked.
 

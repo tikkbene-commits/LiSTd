@@ -1,4 +1,30 @@
-# LiSTd 1.4 standalone validation
+# LiSTd standalone validation
+
+## 1.4.1 — 2026-11-19
+
+The current delivery is `release/LiSTd-Mac.zip`, version 1.4.1/build 7.
+Size: 300,186,557 bytes. SHA-256:
+`269af216960864f4fbe48441294067959c6b895df3d1fe7454f10d4184afb44c`.
+
+- Both packaged runtimes passed the architecture/dependency/minimum-OS audit and
+  isolated relocated/read-only clean-HOME pipeline with blocked host tools/network:
+  cold/warm analysis, mock transfer, frozen callback, verification, sorting,
+  relabel/index updates and state reload.
+- The exact final ZIP passed CRC, version and embedded source equality checks,
+  and strict deep signature verification after extraction outside Desktop sync.
+- All 30 Python tests passed in the pinned isolated development runtime, including
+  concurrent cold/warm backend analysis. Concurrent real-track analysis and repeated
+  GUI analysis passed with NumPy 1.26.4. The original NumPy 2.0.2 runtime reproduced
+  a beat-kernel SIGSEGV under concurrent analysis and is not used in this release.
+- Both native slices compiled. Player, dual-deck, spectrum and skin suites passed
+  on Apple Silicon. The nine-codec/native Intel playback matrix below is historical
+  1.4 evidence and was not repeated for 1.4.1; packaged Intel analysis/pipeline ran
+  under Rosetta. Another physical Mac/macOS 14 and external devices remain untested.
+- Still ad-hoc signed; no Developer ID/notarization was performed. Recipients still
+  need the documented first-open approval. No live music downloads or credential
+  changes were used for this maintenance.
+
+## Historical 1.4 validation
 
 Target: one universal app for Intel and Apple Silicon Macs, macOS 14 or newer.
 Send `release/LiSTd-Mac.zip`; the root LiSTd.app remains the development build.

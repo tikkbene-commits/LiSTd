@@ -1,4 +1,5 @@
 import math
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
@@ -81,11 +82,15 @@ class DeckAnalysisTests(unittest.TestCase):
             command = [sys.executable, '-X', 'faulthandler', str(crate.ROOT/'crate_backend.py'),
                        '--root', directory, 'deck-analysis', str(path)]
             for _ in range(2):
-                process = subprocess.run(command, env=env, capture_output=True, text=True, timeout=120)
-                self.assertEqual(process.returncode, 0, process.stderr + process.stdout)
-                cached = json.loads(process.stdout)
-                self.assertAlmostEqual(cached['bpm'], 120, delta=1)
-                self.assertIsNotNone(cached['cue'])
+                with ThreadPoolExecutor(max_workers=2) as workers:
+                    processes = list(workers.map(
+                        lambda args: subprocess.run(args, env=env, capture_output=True, text=True, timeout=120),
+                        [command, command + ['--bpm', '119.999', '--refine-bpm']]))
+                for process in processes:
+                    self.assertEqual(process.returncode, 0, process.stderr + process.stdout)
+                    cached = json.loads(process.stdout)
+                    self.assertAlmostEqual(cached['bpm'], 120, delta=1)
+                    self.assertIsNotNone(cached['cue'])
             self.assertTrue(any(cache.iterdir()))
             self.assertFalse((Path(directory)/'.music-sorter/catalog.json').exists())
             self.assertEqual(path.read_bytes(), before)

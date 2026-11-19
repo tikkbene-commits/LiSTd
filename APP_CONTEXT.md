@@ -216,7 +216,12 @@ Python-only edits are loaded by subsequent backend processes; Swift/icon edits r
 a rebuild and app restart. Do not interrupt a running import just to refresh the UI.
 
 As of 1.4.1, development uses an isolated venv (no system/user site packages), with
-the numerical runtime pinned in `requirements-crate.txt`. The previous environment
+the numerical runtime pinned in `requirements-crate.txt` (NumPy 1.26.4, Numba 0.60.0,
+llvmlite 0.43.0, librosa 0.11.0). NumPy 2.0.2 reproduced a native crash when concurrent
+deck analyses populated/reused beat-kernel caches; cache isolation alone was not
+sufficient. Keep the pinned stable runtime. It makes the sharing archive larger;
+the resource savings are reduced background work, not a smaller download.
+The previous environment
 is retained at `.music-sorter/audio-env-before-1.4.1` for rollback. Beat-analysis
 compiled caches default to `~/Library/Caches/LiSTd/numba/<runtime-key>`, outside the
 synced Desktop. The key separates executable, Python, CPU architecture and installed
@@ -389,6 +394,10 @@ completed for Black Russian and Blah Blah with fitted cues and sync enabled. Aud
 hashes and catalog/job JSON hashes were unchanged. Idle polling produced three
 backend snapshot launches in 24 seconds. See CHANGELOG.md and STANDALONE_QA.md for
 standalone-package evidence and checks not performed.
+Final concurrent cold/warm generated-audio subprocess tests passed, as did concurrent
+Black Russian/Blah Blah analysis and repeated GUI analysis on the pinned runtime.
+The stable 1.4.1 ZIP passed both architecture sandbox pipelines, CRC/source equality
+and strict deep signature verification after extraction.
 
 ## Commands for future edits
 
