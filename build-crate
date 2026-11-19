@@ -1,0 +1,39 @@
+#!/bin/zsh
+set -eu
+cd "${0:A:h}"
+if [[ ! -x '.music-sorter/audio-env/bin/python' ]]; then
+  /usr/bin/python3 -m venv --system-site-packages '.music-sorter/audio-env'
+  '.music-sorter/audio-env/bin/python' -m pip install -r requirements-crate.txt
+fi
+mkdir -p 'LiSTd.app/Contents/MacOS' 'LiSTd.app/Contents/Resources' '.music-sorter/build'
+for architecture in arm64 x86_64; do
+  swiftc -swift-version 5 -O -parse-as-library -target "$architecture-apple-macosx14.0" native/Crate.swift native/SoulseekAccount.swift native/CrateSkin.swift native/CratePlayer.swift native/BoomboxSkin.swift native/AudioSpectrum.swift native/TechnicalSkin.swift -o ".music-sorter/build/LiSTd.$architecture"
+done
+lipo -create '.music-sorter/build/LiSTd.arm64' '.music-sorter/build/LiSTd.x86_64' -output '.music-sorter/build/LiSTd'
+mv '.music-sorter/build/LiSTd' 'LiSTd.app/Contents/MacOS/LiSTd'
+swift native/MakeIcon.swift '.music-sorter/build/Crate.iconset'
+iconutil -c icns '.music-sorter/build/Crate.iconset' -o 'LiSTd.app/Contents/Resources/Crate.icns'
+swiftc -swift-version 5 -O -parse-as-library -target arm64-apple-macosx14.0 native/CrateSkin.swift native/MakeSkinIcon.swift -o '.music-sorter/build/make-skin-icon'
+'.music-sorter/build/make-skin-icon' '.music-sorter/build/CrateSilverwave.iconset'
+iconutil -c icns '.music-sorter/build/CrateSilverwave.iconset' -o 'LiSTd.app/Contents/Resources/CrateSilverwave.icns'
+cp 'native/Assets/EarIcon.icns' 'LiSTd.app/Contents/Resources/EarIcon.icns'
+cat > 'LiSTd.app/Contents/Info.plist' <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>LiSTd</string>
+<key>CFBundleIdentifier</key><string>local.music.crate</string>
+<key>CFBundleName</key><string>LiSTd</string>
+<key>CFBundleIconFile</key><string>EarIcon</string>
+<key>CFBundleDisplayName</key><string>LiSTd</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleVersion</key><string>6</string>
+<key>CFBundleShortVersionString</key><string>1.4</string>
+<key>LSMinimumSystemVersion</key><string>14.0</string>
+<key>NSHighResolutionCapable</key><true/>
+</dict></plist>
+PLIST
+# Finder adds this attribute on the synced Desktop; it prevents signing our bundle.
+xattr -d com.apple.FinderInfo 'LiSTd.app' 2>/dev/null || true
+codesign --force --sign - 'LiSTd.app'
+print 'Built LiSTd.app. Double-click it in this folder.'

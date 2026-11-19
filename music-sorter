@@ -1,0 +1,6 @@
+#!/bin/zsh
+set -eu
+music_root="${0:A:h}"
+music_python="$music_root/.music-sorter/audio-env/bin/python"
+if [[ ! -x "$music_python" ]]; then music_python="$(command -v python3)"; fi
+exec "$music_python" "$music_root/music_sorter.py" "$@"

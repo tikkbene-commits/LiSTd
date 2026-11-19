@@ -1,0 +1,2 @@
+-r requirements-crate.txt
+pyinstaller==6.17.0
