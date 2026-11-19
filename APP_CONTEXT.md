@@ -239,6 +239,18 @@ The baseline precedes the 1.4.1 stability changes. Music, personal root playlist
 credentials/config, state, environments, generated app bundles and releases are
 excluded from Git. The supplied sample tracklist remains a source fixture.
 
+Public-facing documentation is in `README.md` and the friend-oriented `INSTALL.md`.
+The README has Amped/Signal previews rendered from real views with generated example
+audio by `scripts/render_readme.swift`; it does not show a personal library/account.
+Original LiSTd code is MIT licensed (`LICENSE`, copyright Benedek Tikk); dependency
+licenses remain separate. The v1.4.1 GitHub release provides the unchanged tested
+Mac ZIP, SHA256SUMS.txt and LICENSE. Repository visibility remains private pending
+the user's publication decision. Download links use GitHub Releases, not source ZIPs.
+Separate Sockseek installation is only for source development/standalone CLI use;
+README Requirements links upstream and the tested 3.0.6 Mac archives, with a manual
+one-line install command after extraction. Do not invent an upstream shell installer:
+the upstream Quick Start inspected on 2026-11-19 points to release archives.
+
 When changing behavior, follow its callers across the Swift UI, backend, organizer,
 tests and docs. For folder changes, preserve the catalog IDs, manual overrides,
 recovery history, import paths and app-owned Sockseek index paths together.

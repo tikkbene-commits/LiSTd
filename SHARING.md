@@ -1,5 +1,10 @@
 # Sharing LiSTd
 
+For an installation guide to send to a friend, use [INSTALL.md](INSTALL.md).
+The repository overview and download button are in [README.md](README.md).
+The tested Mac ZIP is also attached to the repository's v1.4.1 GitHub release;
+access to it follows the repository's visibility. Source licensing is in [LICENSE](LICENSE).
+
 Send **release/LiSTd-Mac.zip**. It contains one universal app, both Python/audio runtimes,
 Sockseek 3.0.6, audio-only FFmpeg 8.0 tools, notices and build sources. It contains no
 saved account, music collection, downloads, imports or organizer catalog.
@@ -15,7 +20,7 @@ Intel Macs do not need Rosetta. Windows and macOS 13 or older are unsupported.
 3. Import a tracklist. Downloads and app state live in **~/Music/LiSTd/**. No Terminal,
    Homebrew, Python installation or separate Sockseek installation is needed.
 
-The account button in every skin opens sign-in/sign-out. The password is saved only
+The account button in every skin opens sign-in/sign-out. The saved account is kept
 in this Mac's Keychain. Sockseek gets a mode-600 config in a temporary mode-700
 directory during login/import; normal completion or failure removes it. An abrupt
 OS crash or forced process kill can leave this private temporary file until macOS
@@ -70,7 +75,8 @@ goes through the real owned daemon, per-row search, transfer CLI, frozen verific
 callback, organizer, Sockseek index update, relabel and subsequent state reload.
 No external music download is started. A standalone marker prevents a damaged
 release from falling back to development Python/source files. Runtime caches are
-kept in the writable per-user workspace, including Sockseek's .NET extraction cache.
+kept in writable per-user locations: the numerical analysis cache is under
+`~/Library/Caches/LiSTd/numba/`, while Sockseek's .NET extraction cache is in the workspace.
 
 These checks run on this Apple Silicon Mac, using Rosetta for Intel code. They do
 not replace a physical Intel Mac/macOS 14 acceptance test. Developer ID/notarization

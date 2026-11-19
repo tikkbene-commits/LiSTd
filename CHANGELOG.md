@@ -432,3 +432,34 @@ rather than reconstruct every past chat message.
   arm64/x86_64 passed. Embedded runtime/build sources and README match the project.
   Restored the development app and removed only the generated temporary acceptance
   bundles/fixtures. Delivery ZIP SHA-256 is recorded in STANDALONE_QA.md.
+
+## 2026-11-19 — Public-repository presentation and installation documentation
+
+- Added a README with centered Amped artwork, real Signal preview, feature/skin
+  overview, friend installation steps, tracklist examples, limitations, storage,
+  privacy, developer commands and links to the detailed guides.
+- Added INSTALL.md with download/extraction/Applications steps, first-open approval,
+  sign-in/local playback, imports, updates and troubleshooting. Verified the macOS
+  approval flow against Apple's current support guide. Clarified that the Mac ZIP
+  already bundles Sockseek; linked upstream and the tested 3.0.6 Mac archives for
+  source/CLI use, including an install command after extraction and a version check.
+  Upstream's current README documents release downloads, not a shell-installer command.
+- Added the MIT license for original LiSTd code at the user's request. Kept bundled
+  dependency licenses separate and updated sharing/recipient documentation links
+  and cache locations. The recipient text template changes apply to future builds.
+- Added scripts/render_readme.swift to render actual SwiftUI/AppKit player views
+  using generated example audio in temporary files. Native controls use NSHostingView
+  rendering; ImageRenderer omitted those controls in the first preview attempt.
+  The final Amped and Signal PNGs were visually inspected and contain example data.
+- Created a v1.4.1 GitHub release with the unchanged tested Mac ZIP, its checksum and
+  LICENSE; updated repository description/topics. Kept the repository private and
+  preserved Git history. Checked all three prior commits/38 historical paths for
+  excluded music/account/state/bundle files and credential-like tokens; none matched.
+  Existing developer attribution and local-path documentation remain in history.
+- Validation: both guides rendered through GitHub's GFM API; checked local links,
+  heading anchors, image alt text/dimensions, expandable sections and shell syntax.
+  The initial static check assumed heading IDs in API output; changed it to check
+  rendered heading elements and source anchors, then it passed. GitHub's uploaded
+  asset digest matches the previously validated ZIP SHA-256. No app/runtime source
+  changed; no app rebuild, full playback/audio suite, library scan, credential change
+  or live download was needed for this documentation/release work.

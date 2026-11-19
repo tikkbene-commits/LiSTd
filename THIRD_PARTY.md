@@ -1,5 +1,8 @@
 # Bundled components
 
+LiSTd's original code is licensed under the MIT license in `LICENSE` at the repository
+root. That license does not replace the individual licenses of the components below.
+
 LiSTd invokes unmodified Sockseek as a separate executable. Its release source and
 license are in Sources/sockseek-3.0.6-source.tar.gz (AGPL-3.0).
 Upstream: https://github.com/fiso64/sockseek/tree/v3.0.6
