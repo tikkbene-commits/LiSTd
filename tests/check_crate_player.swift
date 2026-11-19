@@ -106,6 +106,14 @@ import AVFoundation
         precondition(CratePlayer.clock(125.9) == "2:05")
         let after = try Data(contentsOf: url)
         precondition(original == after, "Playback modified the source audio")
+        // Replacing a track cancels its reader, including a reload of the same path.
+        for _ in 0..<8 { player.play(path: url.path, title: "Reload", artist: "Fixture", autoplay: false) }
+        player.play(path: stereoURL.path, title: "Silence", artist: "Fixture", autoplay: false)
+        for _ in 0..<100 {
+            if !player.waveform.isEmpty { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        precondition(!player.waveform.isEmpty && player.waveform.allSatisfy { $0 == 0 }, "Stale waveform replaced the new track")
         if CommandLine.arguments.count > 1 {
             let fixtures = URL(fileURLWithPath: CommandLine.arguments[1])
             for audio in try FileManager.default.contentsOfDirectory(at: fixtures, includingPropertiesForKeys: nil).sorted(by: { $0.path < $1.path }) {

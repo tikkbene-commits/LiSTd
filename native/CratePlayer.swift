@@ -29,7 +29,7 @@ import AVFoundation
     private let source = AVAudioPlayerNode()
     private let speed = AVAudioUnitVarispeed()
     private let equalizer = AVAudioUnitEQ(numberOfBands: 3)
-    private var waveformTask: Task<Void, Never>?
+    private var waveformTask: Task<[Float], Never>?
     private var file: AVAudioFile?
     private var startFrame: AVAudioFramePosition = 0
     private var generation = 0
@@ -96,9 +96,11 @@ import AVFoundation
             analyzing = false
             waveform = []
             waveformTask?.cancel()
-            waveformTask = Task { [weak self] in
-                let points = await Task.detached(priority: .utility) { Self.readWaveform(path) }.value
-                guard !Task.isCancelled, let self, self.path == path else { return }
+            let task = Task.detached(priority: .utility) { Self.readWaveform(path) }
+            waveformTask = task
+            Task { [weak self] in
+                let points = await task.value
+                guard !task.isCancelled, let self, self.path == path else { return }
                 self.waveform = points
             }
             schedule(at: 0, playing: autoplay)
@@ -172,6 +174,7 @@ import AVFoundation
             let count = min(120000, max(1600, Int(Double(file.length) / file.processingFormat.sampleRate * 100)))
             var peaks = [Float](repeating: 0, count: count)
             while file.framePosition < file.length {
+                if Task.isCancelled { return [] }
                 let start = file.framePosition
                 try file.read(into: buffer)
                 guard buffer.frameLength > 0, let channels = buffer.floatChannelData else { break }

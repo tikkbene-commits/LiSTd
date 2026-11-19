@@ -588,7 +588,10 @@ def snapshot(root):
         job = json.loads(path.read_text())
         if job['status'] == 'running':
             try:
-                os.kill(job.get('pid', -1), 0)
+                pid = job.get('pid')
+                if not isinstance(pid, int) or pid <= 0:
+                    raise ProcessLookupError
+                os.kill(pid, 0)
             except (ProcessLookupError, PermissionError):
                 job['status'], job['message'] = 'stopped', 'Interrupted. Retry to continue.'
         jobs.append(job)
@@ -618,8 +621,6 @@ def snapshot(root):
 def deck_analysis(path, bpm=None, refine_bpm=False):
     """Read-only beat estimate for auditioning; never updates the organizer catalog."""
     import array
-    import librosa
-    import numpy as np
     if bpm is not None and (not math.isfinite(bpm) or not 40 <= bpm <= 250):
         raise ValueError('BPM must be between 40 and 250.')
     raw = sorter.run_media([
@@ -632,13 +633,14 @@ def deck_analysis(path, bpm=None, refine_bpm=False):
         samples.byteswap()
     if len(samples) < 8000:
         return {'bpm': bpm, 'cue': None, 'note': 'Too short to estimate beats; set a beat cue manually'}
-    automatic_bpm = bpm is None or refine_bpm
-    if bpm is None:
-        bpm, _ = sorter.spectral_tempo([samples])
-    if bpm is None:
-        return {'bpm': None, 'cue': None, 'note': 'No steady pulse found; enter BPM and set a beat cue'}
+    librosa, np = sorter.audio_modules()
     onset = librosa.onset.onset_strength(y=np.asarray(samples, dtype=np.float32)/32768,
                                         sr=8000, hop_length=80, n_fft=512, n_mels=64)
+    automatic_bpm = bpm is None or refine_bpm
+    if bpm is None:
+        bpm, _ = sorter.spectral_tempo([samples], onset_envelopes=[onset])
+    if bpm is None:
+        return {'bpm': None, 'cue': None, 'note': 'No steady pulse found; enter BPM and set a beat cue'}
     if float(onset.max()) < 0.01:
         return {'bpm': bpm, 'cue': None, 'note': 'No clear beat found; set a beat cue manually'}
     _, beats = librosa.beat.beat_track(onset_envelope=onset, sr=8000, hop_length=80, bpm=bpm, trim=True)

@@ -17,6 +17,7 @@ import tempfile
 import time
 import uuid
 from collections import Counter
+from functools import lru_cache
 
 
 ROOT = Path(__file__).resolve().parent
@@ -156,16 +157,33 @@ def bass_envelope(samples):
     return envelope
 
 
-def spectral_tempo(clips):
+@lru_cache(maxsize=1)
+def audio_modules():
+    import hashlib
+    from importlib.metadata import version
+    import platform
+    # Compiled caches must not cross Python environments, dependency upgrades or architectures.
+    runtime = [sys.executable, sys.version, platform.machine()]
+    runtime += [version(name) for name in ('librosa', 'numpy', 'numba', 'llvmlite')]
+    key = hashlib.sha256('\n'.join(runtime).encode()).hexdigest()[:20]
+    cache = Path(os.environ.get('NUMBA_CACHE_DIR', Path.home()/'Library/Caches/LiSTd/numba'))
+    os.environ['NUMBA_CACHE_DIR'] = str(cache/key)
+    import librosa
+    import numpy as np
+    return librosa, np
+
+
+def spectral_tempo(clips, *, onset_envelopes=None):
     try:
-        import librosa
-        import numpy as np
+        librosa, np = audio_modules()
     except ImportError:
         return None
     estimates = []
-    for samples in clips:
-        y = np.asarray(samples, dtype=np.float32)/32768
-        onset = librosa.onset.onset_strength(y=y, sr=8000, hop_length=80, n_fft=512, n_mels=64)
+    if onset_envelopes is None:
+        onset_envelopes = [librosa.onset.onset_strength(
+            y=np.asarray(samples, dtype=np.float32)/32768, sr=8000, hop_length=80, n_fft=512, n_mels=64)
+            for samples in clips]
+    for onset in onset_envelopes:
         if len(onset) < 400 or float(onset.max()) < 0.01:
             continue
         bpm = float(librosa.feature.tempo(onset_envelope=onset, sr=8000, hop_length=80, max_tempo=190).item())

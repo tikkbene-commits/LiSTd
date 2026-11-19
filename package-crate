@@ -85,6 +85,8 @@ def main():
         work = BUILD/('freeze-work' if architecture == 'arm64' else 'freeze-work-x86_64')
         dist = BUILD/('frozen' if architecture == 'arm64' else 'frozen-x86_64')
         run(*prefix, python, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir', '--name', 'listd-backend',
+            '--copy-metadata', 'librosa', '--copy-metadata', 'numpy',
+            '--copy-metadata', 'numba', '--copy-metadata', 'llvmlite',
             '--target-arch', architecture, '--exclude-module', 'torch', '--exclude-module', 'tensorflow',
             '--exclude-module', 'matplotlib', '--exclude-module', 'pandas', '--exclude-module', 'IPython',
             '--exclude-module', 'pytest', '--distpath', dist, '--workpath', work, '--specpath', work, 'crate_backend.py')

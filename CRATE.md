@@ -195,6 +195,11 @@ or perform recognition/fingerprinting on that mix.
 - `tracklists/YouTube set bNSesW8h94I.csv`: the supplied 15-track list.
 - `.music-sorter/crate/jobs/`: durable imports, original tracklists, indexes and local logs.
 - `.music-sorter/audio-env/`: isolated audio-analysis environment using librosa 0.11.0.
+- `~/Library/Caches/LiSTd/numba/`: compiled analysis kernels, separated by runtime and
+  dependency versions. The first analysis after an update can take longer.
+
+The library refreshes every ten seconds while idle, every two seconds during imports,
+and immediately when LiSTd becomes active or a local action completes.
 
 The app stores its account in macOS Keychain and passes it privately over stdin to
 the backend. Sockseek uses a mode-600 temporary config within a mode-700 temporary

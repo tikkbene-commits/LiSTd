@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
-struct Track: Decodable, Identifiable {
+struct Track: Decodable, Identifiable, Equatable {
     let index: Int
     let artist: String
     let title: String
@@ -18,7 +18,7 @@ struct Track: Decodable, Identifiable {
     var id: Int { index }
 }
 
-struct ImportJob: Decodable, Identifiable {
+struct ImportJob: Decodable, Identifiable, Equatable {
     let id: String
     let name: String
     let status: String
@@ -30,7 +30,7 @@ struct ImportJob: Decodable, Identifiable {
     var attention: Int { tracks.filter { ["unavailable", "review", "stopped"].contains($0.status) }.count }
 }
 
-struct LibraryTrack: Decodable, Identifiable {
+struct LibraryTrack: Decodable, Identifiable, Equatable {
     let id: String
     let artist: String
     let title: String
@@ -89,6 +89,7 @@ struct ReviewAudioInfo: Decodable {
     private var account: SoulseekAccount?
     var fetching = false
     var initialized = false
+    private var lastRefresh = Date.distantPast
     var pending: [String] = []
     let root: URL
 
@@ -130,7 +131,6 @@ struct ReviewAudioInfo: Decodable {
                 process.currentDirectoryURL = project
                 var env = ProcessInfo.processInfo.environment
                 env["PATH"] = bundled.map { $0.deletingLastPathComponent().path + ":/usr/bin:/bin" } ?? "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-                env["NUMBA_CACHE_DIR"] = project.appendingPathComponent(".music-sorter/numba-cache").path
                 env["DOTNET_BUNDLE_EXTRACT_BASE_DIR"] = project.appendingPathComponent(".music-sorter/sockseek-runtime").path
                 process.environment = env
                 let output = Pipe()
@@ -158,13 +158,14 @@ struct ReviewAudioInfo: Decodable {
     func refresh() {
         guard !fetching else { return }
         fetching = true
+        lastRefresh = Date()
         request(["snapshot"]) { result in
             self.fetching = false
             do {
                 let state = try JSONDecoder().decode(Snapshot.self, from: result.get())
-                self.jobs = state.jobs
-                self.library = state.library
-                self.ready = state.ready
+                if self.jobs != state.jobs { self.jobs = state.jobs }
+                if self.library != state.library { self.library = state.library }
+                if self.ready != state.ready { self.ready = state.ready }
                 if !self.initialized {
                     self.initialized = true
                     if !self.configured { self.showAccount = true }
@@ -175,6 +176,11 @@ struct ReviewAudioInfo: Decodable {
                 }
             } catch { self.error = error.localizedDescription }
         }
+    }
+
+    func poll() {
+        let busy = working || !pending.isEmpty || jobs.contains { $0.status == "running" }
+        if busy || Date().timeIntervalSince(lastRefresh) >= 10 { refresh() }
     }
 
     func importText(_ text: String, name: String, order: String, minimum: Int, automatic: Bool) {
@@ -387,7 +393,8 @@ struct CrateView: View {
         }
         .onChange(of: player.path) { _, _ in if skin == .technical { analyzeDeck(player) } }
         .onChange(of: deckB.path) { _, _ in if skin == .technical { analyzeDeck(deckB) } }
-        .onReceive(timer) { _ in model.refresh() }
+        .onReceive(timer) { _ in model.poll() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in model.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in model.stopAll() }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.commaSeparatedText, .plainText, .tabSeparatedText]) { result in
             switch result {

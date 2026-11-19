@@ -90,6 +90,8 @@ def exercise(app, architecture, folder, original_app):
     original = hashlib.sha256(source.read_bytes()).digest()
     analysis = json.loads(request('deck-analysis', source, '--bpm', '120'))
     assert analysis['bpm'] == 120 and hashlib.sha256(source.read_bytes()).digest() == original, analysis
+    warmed = json.loads(request('deck-analysis', source, '--bpm', '120'))
+    assert warmed == analysis, (analysis, warmed)
 
     # Inject only a local mock peer; run the shipped worker, daemon, CLI and frozen callback.
     sys.path.insert(0, str(app/'Contents/Resources/Sources'))

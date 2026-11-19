@@ -5,6 +5,45 @@ decisions, validation performed and any checks skipped. Keep this history factua
 the initial entries below summarize retained source, local records and this session,
 rather than reconstruct every past chat message.
 
+## 2026-11-19 — LiSTd 1.4.1 stability, resource use and GitHub history
+
+- Reproduced the reported Python SIGSEGV in librosa beat tracking with the app's
+  existing compiled cache; the same generated-audio tests passed with a fresh cache
+  and on reuse. Isolated compiled caches by executable, Python, CPU architecture
+  and numerical dependency versions, and moved the default outside the synced Desktop.
+  Kept the beat estimator and its accuracy checks. Added cold/warm subprocess coverage
+  and package checks so testing uses separate backend launches, as the GUI does.
+- Replaced the development environment's inherited user/system packages with an
+  isolated venv and pinned NumPy/Numba/llvmlite alongside librosa. Retained the old
+  environment for rollback. New builds also create isolated environments; frozen
+  builds explicitly include dependency metadata used to separate caches.
+- Reused spectral onset computation within deck analysis. Cancelled obsolete waveform
+  readers, including repeated loads of the same file. Idle snapshot polling changes
+  from two to ten seconds (80% fewer launches); active imports retain two seconds,
+  app activation/local actions refresh immediately. Avoided republishing unchanged
+  library/job arrays. All skins, analysis precision and playback controls remain.
+- Fixed interrupted imports without a positive process ID appearing to run forever.
+- Created the private tikkbene-commits/LiSTd GitHub repository with a source baseline
+  before fixes. Excluded music, personal playlists, state, config/credentials,
+  environments, generated app bundles and releases.
+- Validation: all 30 Python tests passed in the isolated environment with the old
+  app-cache parent explicitly supplied (the new runtime partition avoided the
+  reproducible crash). Separate cold/warm backend launches passed; deck analysis
+  computes onset strength once. Pip dependency validation passed. Native player,
+  dual-deck, spectrum and Silverwave/boombox render suites passed on this Mac.
+  Built both native architectures. Observed three snapshot processes in 24 idle
+  seconds. A strict root-app signature check initially failed when Desktop sync
+  restored FinderInfo; removing that generated-bundle attribute and resigning passed.
+- Graphical validation: restarted the rebuilt app, loaded Black Russian into A
+  and Blah Blah into B through the local file pickers, and observed both analyses
+  complete with fitted cues and enabled sync. The first native inspection attempt
+  timed out; a later attempt succeeded. CLI analyses of the same two files also
+  passed and their SHA-256 hashes were unchanged. Catalog and job JSON hashes were
+  unchanged after GUI analysis; the existing 147-track library remains intact.
+- Standalone package validation is in progress. No new live downloads, global
+  Soulseek configuration changes or protected collection moves were performed.
+  External audio devices, another physical Mac and notarization were not checked.
+
 ## 2026-11-18 — LiSTd, modular player, live spectrum and motion
 
 - Renamed the app bundle/executable, window, menus and visible branding to LiSTd.

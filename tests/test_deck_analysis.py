@@ -1,6 +1,9 @@
 import math
+import json
+import os
 from pathlib import Path
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -63,11 +66,28 @@ class DeckAnalysisTests(unittest.TestCase):
                 output.setparams((1, 2, rate, 0, 'NONE', 'not compressed'))
                 output.writeframes(struct.pack('<' + 'h' * len(samples), *samples))
             before = path.read_bytes()
-            result = crate.deck_analysis(path)
+            librosa, _ = crate.sorter.audio_modules()
+            with patch.object(librosa.onset, 'onset_strength', wraps=librosa.onset.onset_strength) as onset:
+                result = crate.deck_analysis(path)
+                self.assertEqual(onset.call_count, 1)
             self.assertAlmostEqual(result['bpm'], 120, delta=1)
             self.assertIsNotNone(result['cue'])
             phase = (result['cue'] - 0.2) % 0.5
             self.assertLess(min(phase, 0.5 - phase), 0.08)
+            self.assertEqual(path.read_bytes(), before)
+            # A second backend must reuse compiled caches safely, as the app does.
+            cache = Path(directory)/'compiled-cache'
+            env = dict(os.environ, NUMBA_CACHE_DIR=str(cache))
+            command = [sys.executable, '-X', 'faulthandler', str(crate.ROOT/'crate_backend.py'),
+                       '--root', directory, 'deck-analysis', str(path)]
+            for _ in range(2):
+                process = subprocess.run(command, env=env, capture_output=True, text=True, timeout=120)
+                self.assertEqual(process.returncode, 0, process.stderr + process.stdout)
+                cached = json.loads(process.stdout)
+                self.assertAlmostEqual(cached['bpm'], 120, delta=1)
+                self.assertIsNotNone(cached['cue'])
+            self.assertTrue(any(cache.iterdir()))
+            self.assertFalse((Path(directory)/'.music-sorter/catalog.json').exists())
             self.assertEqual(path.read_bytes(), before)
             self.assertAlmostEqual(crate.deck_analysis(path, 120)['bpm'], 120)
             with self.assertRaises(ValueError):

@@ -66,6 +66,19 @@ class AccountTests(unittest.TestCase):
 
 
 class ParserTests(unittest.TestCase):
+    def test_snapshot_marks_running_jobs_without_a_valid_pid_interrupted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            job = crate.create_job(root, 'Artist,Title\nFixture,Track\n', 'Fixture', 'artist-title', 320)
+            path = root/'.music-sorter/crate/jobs'/job['id']/'job.json'
+            for pid in (None, -1, 0):
+                job.update(status='running', pid=pid)
+                path.write_text(json.dumps(job))
+                with patch.object(crate.os, 'kill') as kill:
+                    state = crate.snapshot(root)
+                    self.assertEqual(state['jobs'][0]['status'], 'stopped')
+                    kill.assert_not_called()
+
     def test_supplied_set_and_cues_are_not_lengths(self):
         text = (crate.ROOT/'tracklists/YouTube set bNSesW8h94I.csv').read_text()
         rows, fields = crate.parse_tracklist(text)

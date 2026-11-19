@@ -187,7 +187,7 @@ the import form. No download starts merely by opening the sheet or switching ski
 | `scripts/package_licenses.py` / `THIRD_PARTY.md` | Notices and source provenance bundled in the sharing archive |
 | `SHARING.md` | Recipient instructions, signing limitations and release build procedure |
 | `STANDALONE_QA.md` | Architecture/runtime validation evidence and remaining distribution limits |
-| `requirements-crate.txt` | Pinned local audio dependency, librosa 0.11.0 |
+| `requirements-crate.txt` | Pinned librosa 0.11.0 and NumPy/Numba/llvmlite runtime |
 | `tests/test_crate_backend.py` | Parser, pipeline, quality/identity rejection, library preservation and label/index-update checks |
 | `tests/test_music_sorter.py` | Tempo, naming, incremental sorting, collisions, moves, watch and undo checks |
 | `tests/check_crate_skin.swift` | Silverwave emblem and blue/red boombox render checks |
@@ -214,6 +214,25 @@ Do not recursively copy a synced frozen output directory into a release: Desktop
 sync was observed adding conflict copies of compiled libraries to that directory.
 Python-only edits are loaded by subsequent backend processes; Swift/icon edits require
 a rebuild and app restart. Do not interrupt a running import just to refresh the UI.
+
+As of 1.4.1, development uses an isolated venv (no system/user site packages), with
+the numerical runtime pinned in `requirements-crate.txt`. The previous environment
+is retained at `.music-sorter/audio-env-before-1.4.1` for rollback. Beat-analysis
+compiled caches default to `~/Library/Caches/LiSTd/numba/<runtime-key>`, outside the
+synced Desktop. The key separates executable, Python, CPU architecture and installed
+librosa/NumPy/Numba/llvmlite versions. `NUMBA_CACHE_DIR` can override the parent directory
+for isolated tests. Do not reuse the old unpartitioned `.music-sorter/numba-cache`.
+First analysis in a fresh runtime takes longer while numerical kernels compile.
+Deck analysis reuses the same onset envelope for tempo and beat fitting.
+Waveform readers cancel when a deck loads another file. Snapshot polling remains
+every two seconds during imports, and runs every ten seconds when idle, with an
+immediate refresh on app activation and local actions. Unchanged jobs/library arrays
+are not republished, avoiding unnecessary collection redraws.
+
+Source history is in the private repository https://github.com/tikkbene-commits/LiSTd.
+The baseline precedes the 1.4.1 stability changes. Music, personal root playlists,
+credentials/config, state, environments, generated app bundles and releases are
+excluded from Git. The supplied sample tracklist remains a source fixture.
 
 When changing behavior, follow its callers across the Swift UI, backend, organizer,
 tests and docs. For folder changes, preserve the catalog IDs, manual overrides,
@@ -270,7 +289,7 @@ index files are in `.music-sorter/build/before-review-fix-cf100cc63f74/`.
 | --- | --- |
 | `.music-sorter/catalog.json` | Stable track IDs, cached analysis, manual overrides and reversible move history |
 | `.music-sorter/crate/jobs/<id>/` | Durable import state, original input, completion outcomes, indexes and local logs |
-| `.music-sorter/audio-env/` | Local Python audio-analysis environment, currently using installed system-site packages as well as its pinned dependency |
+| `.music-sorter/audio-env/` | Isolated Python audio-analysis environment with pinned numerical dependencies |
 | `.music-sorter/build/` | Generated native build/icon artifacts |
 | `~/Library/Caches/LiSTdBuild/` | Disposable release-only environments, frozen runtimes and tool-build cache, outside Desktop sync |
 | `downloads/.incoming/` | Staging; may include complete files awaiting review, not just disposable partial transfers |
@@ -362,6 +381,14 @@ Checked from the current local catalog/import state when writing this handoff:
 
 Source/state are authoritative over this snapshot. New chats should inspect the job
 JSON/catalog rather than assume counts or old test results remain current.
+
+1.4.1 local validation (2026-11-19): 30 Python tests passed, including cold/warm
+backend processes with the previous app-cache parent. Native player, dual-deck,
+spectrum and skin suites passed; both native slices built. Graphical Signal analysis
+completed for Black Russian and Blah Blah with fitted cues and sync enabled. Audio
+hashes and catalog/job JSON hashes were unchanged. Idle polling produced three
+backend snapshot launches in 24 seconds. See CHANGELOG.md and STANDALONE_QA.md for
+standalone-package evidence and checks not performed.
 
 ## Commands for future edits
 
