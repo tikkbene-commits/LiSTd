@@ -30,9 +30,13 @@ rather than reconstruct every past chat message.
   visible screen by macOS for a few seconds before it was made transparent and
   pinned offscreen. Harness crash reports in DiagnosticReports are from early
   harness runs (`fatalError` timeouts and an invalid key), not from LiStD.
+- Final rerun: 21 checks passed, including an assertion that the test window was
+  never visible on any screen (transparent and pinned offscreen from creation). The
+  crash-report count stayed at the three early harness reports, so neither the final
+  harness nor the rebuilt LiStD.app produced any.
 - Still not done: clicking in the visible app window (no Screen Recording or
-  Accessibility permission for this session). Pushing the branch was blocked by a
-  permission check.
+  Accessibility permission for this session); the user chose to do that click-through
+  themselves. Pushing the branch was blocked by a permission check.
 
 ## 2026-11-21 — Cyber · Lilac skin
 
