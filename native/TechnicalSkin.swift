@@ -88,23 +88,7 @@ private struct SignalDeck: View {
                 SignalWaveform(player: player, overview: true, windowSeconds: waveformSeconds).frame(height: 18)
             }
             .overlay(Rectangle().stroke(dropTargeted ? TechnicalPlayer.green : .clear, lineWidth: 2))
-            .onDrop(of: [UTType.fileURL.identifier], isTargeted: $dropTargeted) { providers in
-                guard providers.count == 1, let provider = providers.first else { return false }
-                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-                    let url: URL?
-                    if let data = item as? Data { url = URL(dataRepresentation: data, relativeTo: nil) }
-                    else if let value = item as? URL { url = value }
-                    else if let value = item as? String { url = URL(string: value) }
-                    else { url = nil }
-                    guard let url, url.isFileURL,
-                          let type = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType,
-                          type.conforms(to: .audio) else { return }
-                    Task { @MainActor in
-                        player.play(path: url.path, title: "", artist: "Local audio", autoplay: false)
-                    }
-                }
-                return true
-            }
+            .onDrop(of: [UTType.fileURL.identifier], isTargeted: $dropTargeted, perform: player.loadDroppedAudio)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 8)], spacing: 8) {
                 Button { player.toggle() } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").frame(width: 24)
