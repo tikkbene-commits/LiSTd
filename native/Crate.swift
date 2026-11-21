@@ -402,7 +402,6 @@ struct CrateView: View {
         }
         }
         .tint(skin.accent)
-        .preferredColorScheme(skin == .technical ? .dark : skin == .classic ? nil : .light)
         .frame(minWidth: 800, minHeight: skin == .boombox ? 720 : skin == .silverwave ? 680 : 620)
         .toolbar {
             ToolbarItem(placement: .automatic) {
@@ -420,9 +419,10 @@ struct CrateView: View {
                 .keyboardShortcut("n", modifiers: .command)
             }
         }
-        .onAppear { model.refresh(); updateDockIcon(); if skin == .technical { prepareTechnical() } }
+        .onAppear { model.refresh(); updateDockIcon(); applyAppearance(skin); if skin == .technical { prepareTechnical() } }
         .onChange(of: skin) { _, value in
             updateDockIcon()
+            applyAppearance(value)
             if value == .technical { prepareTechnical() }
             else if deckB.isPlaying { deckB.toggle() }
         }
@@ -590,6 +590,16 @@ struct CrateView: View {
         Picker("Skin", selection: $skin) {
             ForEach(CrateSkin.allCases) { option in Text(option.title).tag(option) }
         }.pickerStyle(.menu).fixedSize().accessibilityLabel("Skin").help("Change LiStD’s skin")
+    }
+
+    // SwiftUI's preferredColorScheme does not undo a forced dark window when it later
+    // receives nil, so leaving Signal for Original left AppKit views dark while SwiftUI
+    // text followed the light system scheme. Set the appearance explicitly instead;
+    // nil (Original) really returns every window to the system setting.
+    func applyAppearance(_ skin: CrateSkin) {
+        let appearance: NSAppearance? = skin == .technical ? NSAppearance(named: .darkAqua) : skin == .classic ? nil : NSAppearance(named: .aqua)
+        NSApp.appearance = appearance
+        for window in NSApp.windows { window.appearance = nil }
     }
 
     func updateDockIcon() {

@@ -65,6 +65,10 @@ spectrum, chrome transport, shell/side/speaker/vent actions and vertical pitch
 fader. Player size still controls the artwork's fit within its real player pane.
 Silverwave retains its silver/purple panel and decorative display; Original uses
 native controls. The ear icon remains `native/Assets/EarIcon.icns`.
+Appearance is set per skin with `NSApp.appearance` (`applyAppearance` in
+`native/Crate.swift`): Signal dark, Amped/Silverwave light, Original follows the
+system. Do not use SwiftUI `preferredColorScheme(nil)` to restore the system
+appearance; it leaves a previously forced dark window partly dark.
 
 All horizontal controls use `StableSlider` in `native/CratePlayer.swift`: one native
 NSSlider owns drawing and tracking, avoiding SwiftUI's separate tracking overlay

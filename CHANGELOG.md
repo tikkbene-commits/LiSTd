@@ -591,3 +591,18 @@ rather than reconstruct every past chat message.
   asset digest matches the previously validated ZIP SHA-256. No app/runtime source
   changed; no app rebuild, full playback/audio suite, library scan, credential change
   or live download was needed for this documentation/release work.
+
+## 2026-11-21 — Skin switch appearance fix
+
+- Fixed mixed dark/light colours after leaving **Signal · Dual Deck** for
+  **LiStD · Original**. Signal forced dark mode through SwiftUI
+  `preferredColorScheme(.dark)`; Original passed `nil`, which SwiftUI on macOS does
+  not apply, so AppKit-backed views (collection table, sliders, toolbar) stayed dark
+  while SwiftUI text followed the light system scheme. The root view now sets
+  `NSApp.appearance` per skin on launch and on every skin change (Signal dark, Amped
+  and Silverwave light, Original follows the system) and clears per-window overrides.
+- Affected skin: Original only. Amped and Silverwave passed an explicit light value
+  and already reset correctly; Signal itself was unaffected.
+- Validation: `./build-crate` succeeded (both slices); native skin check passed.
+  Manual visual check of the skin switch in the running app was not performed by the
+  agent; it is left to the user.
