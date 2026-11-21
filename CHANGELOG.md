@@ -1,9 +1,137 @@
-# Crate change history
+# LiStD change history
 
 Append dated entries after future app changes. Include what changed, relevant
 decisions, validation performed and any checks skipped. Keep this history factual;
 the initial entries below summarize retained source, local records and this session,
 rather than reconstruct every past chat message.
+
+## 2026-11-21 — Final rebuilt-binary verification
+
+- Confirmed the final rebuilt LiStD binary refreshes the real collection after
+  macOS file access approval: all 155 tracks and the existing import history are
+  present. Signal's collection A/B buttons remain visible at the narrow window
+  size, and the mixer/import divider changes the real layout independently.
+- Corrected AppKit's final mouse-tracking value restoration by sending the snapped
+  slider value after tracking returns. Actual waveform-zoom clicking now keeps
+  the native thumb/accessibility value and the displayed value equal; arrow-key
+  stepping also passed. Left Signal selected with its 36-second waveform window.
+- The complete prescribed Python suite passed (37 tests), as did focused native
+  slider, collection, reverse-sync, playback, spectrum, skin/fader and no-UI Keychain
+  checks. Both architectures rebuilt. Offline deep-search tests used simulated
+  Soulseek results and generated audio; no live downloads were started.
+- Final catalog and all three original import-record hashes match the pre-UI
+  manifest; the temporary progress fixture is gone. Diff whitespace checks passed.
+  Strict bundle-signature verification passed after removing Desktop-added
+  FinderInfo metadata, without re-signing or rebuilding again.
+- The initial transient jump was not captured frame by frame, and the UI driver's
+  final custom vertical-fader drag failed; its hosted focus/accessibility regression
+  passed. Physical Intel/macOS 14 and a newly packaged standalone ZIP were not
+  tested. The saved account remains available through Unlock saved account; no
+  credentials were changed. No release was published or replaced.
+
+## 2026-11-20 — Final UI access and control follow-up
+
+- After the user approved macOS access, confirmed the actual app displayed all 155
+  existing collection tracks and original import history. Inspected final Amped,
+  Silverwave and Original layouts at the narrow window size; artwork/headers now
+  remain inside their panes, with full-size native transport available.
+- Made the collection title column follow its pane width explicitly: native table
+  autosizing had retained an oversized column after shrinking and clipped A/B.
+  Selection, row file-URL providers and context menus are retained. Also applied the
+  measured top inset consistently to the player and removed the lower drawer's
+  inherited window-top inset.
+- Reused TrackingSlider for the custom vertical pitch fader. Its hosted native
+  regression verifies the chrome cell, first-responder acceptance and actual
+  accessibility increment/decrement updating the binding. Native skin/fader checks
+  passed, and both app architectures rebuilt successfully. Player-size clicking,
+  keyboard stepping and Fill window were verified in the app. The UI driver's final
+  coordinate drag attempt returned noWindowsAvailable, so it is not claimed as a
+  successful final vertical-fader drag test.
+- Restored Signal. The final rebuilt app may need renewed macOS Desktop approval;
+  its latest snapshot is waiting on file access. Earlier access approval restored
+  the real data without any recovery or catalog changes. No live downloads, account
+  changes, public release work or protected-library moves were performed.
+
+## 2026-11-20 — LiStD 1.5 collection, mixer and import workspace
+
+- Renamed current app branding, native artwork, bundle/display/executable and future
+  package output to **LiStD**, exactly. Kept bundle/Keychain identifiers, preferences,
+  standalone marker, per-user data/cache roots and catalog/import paths stable.
+  Regenerated the two README player previews with generated local audio. Existing
+  public release assets, repository name and remote state were not changed.
+- Replaced horizontal SwiftUI sliders with one shared native NSSlider implementation:
+  native tracking coordinates, current bindings, original step sizes, explicit
+  keyboard focus/arrows and accessibility increments/decrements. Snapped the native
+  thumb/AX value together with the binding. Removed player-size-wide layout animation;
+  retained the native vertical pitch fader's actual dimensions and all skin artwork.
+  The initial capture did not catch the original transient upper-left jump; its
+  precise SwiftUI internal cause remains an inference. Native clicking/dragging
+  remained stationary during the observed checks.
+- Added **Sync A to B** beside **Sync B to A**, with explicit help describing the
+  changed deck. Both call the existing guarded tempo/phase implementation. Generalized
+  the end-of-track error text and added paused/running reverse-sync checks that
+  assert B's settings remain unchanged.
+- Collection defaults to All tracks, with folder, import/tracklist, genre and artist
+  views, scoped search and title/artist/BPM/newest sorting. Preserved A/B loading,
+  selection, file-URL providers, Finder reveal, playback and explicit label editing.
+  Display metadata comes from current catalog paths/import records; browsing never
+  organizes audio. New catalog entries record added time, with documented read-only
+  import/file-date fallbacks for old catalogs. Duplicate import names get short IDs.
+- Replaced Signal's modal Tracks & imports workspace and fixed column ratios with
+  common native horizontal/vertical split panes across all four skins. Collection,
+  player and the collapsible import drawer remain visible together, with draggable
+  dividers, independent scrolling, responsive control grids and wrapping import rows.
+  New import opens the drawer directly. Root-owned players/model/selection preserve
+  playback and queue state during changes. Amped clips its artwork, has a sensible
+  player minimum and keeps full-size native transport controls available at reduced
+  artwork sizes. Silverwave and Original retain their styling and player controls.
+- Added opt-in individual/batch deep search through the existing download lock,
+  owned loopback daemon, sequential queue, cancel file and verification-first hook.
+  At most six normalized/reordered/title/release/catalog/omitted-word queries run
+  sequentially per missing row. Original fields, full duration and cue separation
+  stay intact. Results/inspection/log sizes and transfer attempts are bounded.
+  Accepted tracks/staged review files are excluded. Exact evidence can proceed;
+  spelling variants/conflicting or unexplained metadata are shown as review
+  candidates, with explicit download-and-verify actions. Unrequested version words
+  and supplied-duration conflicts are excluded. Codec, packet bitrate, full decode
+  and local identity checks still gate organizing. No audio fingerprinting was added.
+- Found a real restart hang after ad-hoc signing: a process sample showed the main
+  thread waiting in SecItemCopyMatching for Keychain authorization. Startup now
+  suppresses legacy login-Keychain authentication UI and exposes Unlock saved account;
+  the explicit interactive read runs off the main thread. Existing credentials are
+  neither deleted nor migrated. Modern no-UI flags did not prevent the wait for this
+  legacy store, so the compatibility guard uses deprecated SecKeychain UI-policy
+  APIs and restores the prior process policy. The noninteractive check returned
+  immediately with authorization status -25293 and the final window opened.
+- Automated validation: all 37 Python tests passed in the prescribed isolated audio
+  environment; new tests cover matching/version/typo safety, bounded query selection,
+  CSV preservation, cancellation, missing-only retries, candidate selection guards,
+  deep local verification and read-only collection metadata. Native player, reverse
+  dual-deck, actual rendered pulse/EQ, spectrum, collection and slider checks passed;
+  Silverwave/Amped render checks passed. An additional generated-WAV end-to-end test
+  used the actual mock Sockseek daemon/CLI, fallback CSV, exact transfer, completion
+  hook, verification and real sorter; the mock source hash stayed unchanged.
+- Graphical validation: rebuilt/restarted and observed LiStD branding, default All
+  tracks, all browse/sort options, scoped search, two local tracks loaded through A/B,
+  both sync actions, native slider clicking/dragging, EQ/level controls after resizing,
+  and waveform zoom keyboard focus/steps. Dragged both dividers and checked the
+  1280-point and 800-point window layouts. Playback continued through drawer changes.
+  A temporary offline job showed changing progress with the drawer resized/closed/
+  reopened while local playback and selection persisted; the exact fixture was
+  removed afterward. All original catalog/job JSON hashes remained unchanged.
+- Build validation: both arm64/x86_64 slices built for macOS 14+. Strict codesign
+  verification passed after removing the generated bundle's FinderInfo attribute;
+  Desktop sync can restore it, as in prior builds. Intermediate builds invalidated by
+  in-flight source edits were rebuilt. The initial slider unit fixture needed an
+  NSApplication instance for target/action dispatch; the corrected check passed.
+- No live downloads, global account/config edits, protected-library moves, push,
+  publication, release replacement or standalone package rebuild occurred. A final
+  renamed-app backend launch waited in Python file-open during startup; macOS file
+  access approval is pending while the CLI snapshot confirms the original 155-track /
+  three-import workspace. System permission dialogs require the user's action. The native inspection
+  service subsequently returned cgWindowNotFound on the last restart; the final
+  safe-area/minimum-height adjustment compiled but its visual recheck is pending.
+  Physical Intel/macOS 14 and external-device testing remain outstanding.
 
 ## 2026-11-19 — LiSTd 1.4.1 stability, resource use and GitHub history
 

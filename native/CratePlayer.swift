@@ -1,6 +1,77 @@
 import SwiftUI
 import AVFoundation
 
+// SwiftUI's macOS slider can animate its tracking overlay from the hosting origin.
+// Keep the control and its tracking in one native coordinate space at every size.
+struct StableSlider: NSViewRepresentable {
+    @Binding var value: Double
+    let bounds: ClosedRange<Double>
+    var step: Double? = nil
+    var editing: (Bool) -> Void = { _ in }
+    @Environment(\.isEnabled) private var enabled
+
+    init(value: Binding<Double>, in bounds: ClosedRange<Double>, step: Double? = nil,
+         onEditingChanged: @escaping (Bool) -> Void = { _ in }) {
+        _value = value; self.bounds = bounds; self.step = step; editing = onEditingChanged
+    }
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    func makeNSView(context: Context) -> TrackingSlider {
+        let slider = TrackingSlider()
+        slider.isContinuous = true
+        slider.target = context.coordinator
+        slider.action = #selector(Coordinator.changed(_:))
+        slider.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        return slider
+    }
+    func updateNSView(_ slider: TrackingSlider, context: Context) {
+        context.coordinator.parent = self
+        slider.minValue = bounds.lowerBound; slider.maxValue = bounds.upperBound
+        slider.doubleValue = value; slider.isEnabled = enabled
+        slider.increment = step ?? (bounds.upperBound - bounds.lowerBound) / 100
+        slider.editing = editing
+    }
+    final class Coordinator: NSObject {
+        var parent: StableSlider
+        init(_ parent: StableSlider) { self.parent = parent }
+        @objc func changed(_ slider: NSSlider) {
+            let raw = slider.doubleValue
+            let value = parent.step.map { parent.bounds.lowerBound + ((raw - parent.bounds.lowerBound) / $0).rounded() * $0 } ?? raw
+            let snapped = min(parent.bounds.upperBound, max(parent.bounds.lowerBound, value))
+            slider.doubleValue = snapped
+            parent.value = snapped
+        }
+    }
+}
+
+final class TrackingSlider: NSSlider {
+    var editing: (Bool) -> Void = { _ in }
+    var increment = 0.01
+    override var acceptsFirstResponder: Bool { true }
+    override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
+        editing(true)
+        super.mouseDown(with: event)
+        // AppKit can restore its raw tracking value after the last continuous action.
+        sendAction(action, to: target)
+        editing(false)
+    }
+    private func adjust(_ delta: Double) -> Bool {
+        guard isEnabled else { return false }
+        editing(true)
+        doubleValue = min(maxValue, max(minValue, doubleValue + delta))
+        sendAction(action, to: target)
+        editing(false)
+        return true
+    }
+    override func keyDown(with event: NSEvent) {
+        if [123, 124, 125, 126].contains(event.keyCode) {
+            _ = adjust(([123, 125].contains(event.keyCode) ? -1 : 1) * increment)
+        } else { super.keyDown(with: event) }
+    }
+    override func accessibilityPerformIncrement() -> Bool { adjust(increment) }
+    override func accessibilityPerformDecrement() -> Bool { adjust(-increment) }
+}
+
 // Varispeed couples tempo and pitch, like changing a turntable's speed.
 @MainActor final class CratePlayer: ObservableObject {
     @Published private(set) var title = "Choose a track"
@@ -161,7 +232,7 @@ import AVFoundation
         let nearestBeat = ((position - beatCue!) / beatLength - phase).rounded()
         var target = beatCue! + (nearestBeat + phase) * beatLength
         if target < 0 { target += beatLength }
-        guard target < duration else { error = "Seek deck B away from the end, then sync again."; return }
+        guard target < duration else { error = "Seek the deck being synced away from the end, then sync again."; return }
         rate = matchedRate
         schedule(at: target, playing: master.isPlaying,
                  hostTime: hostTime)
@@ -276,8 +347,8 @@ struct PlaybackStrip: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            HStack(spacing: 12) {
-                if !compact {
+            if !compact {
+                HStack(spacing: 12) {
                     Button { player.openFile() } label: { Image(systemName: "folder") }.help("Open audio file")
                     Button { player.toggle() } label: { Image(systemName: player.isPlaying ? "pause.fill" : "play.fill") }
                         .disabled(!player.loaded).accessibilityLabel(player.isPlaying ? "Pause" : "Play")
@@ -285,10 +356,12 @@ struct PlaybackStrip: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(player.title).fontWeight(.semibold).lineLimit(1)
                         Text(player.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                    }.frame(width: 180, alignment: .leading)
+                    }.frame(maxWidth: .infinity, alignment: .leading)
                 }
+            }
+            HStack(spacing: 8) {
                 Text(CratePlayer.clock(scrubbing ? scrubPosition : player.position)).monospacedDigit().frame(width: 42)
-                Slider(value: Binding(get: { scrubbing ? scrubPosition : player.position }, set: { scrubPosition = $0 }),
+                StableSlider(value: Binding(get: { scrubbing ? scrubPosition : player.position }, set: { scrubPosition = $0 }),
                        in: 0...max(1, player.duration), onEditingChanged: { editing in
                     if editing { scrubPosition = player.position }
                     scrubbing = editing
@@ -296,19 +369,17 @@ struct PlaybackStrip: View {
                 }).disabled(!player.loaded).accessibilityLabel("Track position")
                 Text(CratePlayer.clock(player.duration)).monospacedDigit().frame(width: 42)
                 Image(systemName: "speaker.wave.2.fill").accessibilityHidden(true)
-                Slider(value: $player.volume, in: 0...1).frame(width: 85).accessibilityLabel("Volume")
+                StableSlider(value: $player.volume, in: 0...1).frame(minWidth: 45, maxWidth: 85).accessibilityLabel("Volume")
             }
             HStack(spacing: 12) {
                 Text("PITCH / SPEED").font(.system(size: 10, weight: .bold, design: .monospaced))
-                Text("Slower").foregroundStyle(.secondary)
-                Slider(value: $player.rate, in: 0.5...1.5, step: 0.01).frame(maxWidth: 250).accessibilityLabel("Pitch and speed")
-                Text("Faster").foregroundStyle(.secondary)
-                Text(player.speedLabel).monospacedDigit().frame(width: 135)
+                StableSlider(value: $player.rate, in: 0.5...1.5, step: 0.01).frame(maxWidth: 250).accessibilityLabel("Pitch and speed")
+                Text(player.speedLabel).monospacedDigit().frame(width: 115)
                 Button("Reset") { player.rate = 1 }.help("Reset pitch and speed to the original recording")
             }
         }
         .font(.system(size: 11))
-        .padding(.horizontal, 20).padding(.vertical, 12)
+        .padding(.horizontal, 12).padding(.vertical, 12)
         .onReceive(clock) { _ in if !scrubbing { player.updatePosition() } }
     }
 }

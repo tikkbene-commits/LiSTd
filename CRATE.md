@@ -1,13 +1,14 @@
-# LiSTd
+# LiStD
 
 For development in a new chat, start with `AGENTS.md` and `APP_CONTEXT.md`.
 `CHANGELOG.md` records changes and their validation; keep both handoff files current
 after editing the app.
 
-Double-click **LiSTd.app** in this MUSIC folder. This is a native macOS window,
+Double-click **LiStD.app** in this MUSIC folder. This is a native macOS window,
 not a browser or a terminal skin. This development build stays alongside
 `crate_backend.py` and `music_sorter.py` and uses this folder as its workspace.
-To send the app to someone else, use **release/LiSTd-Mac.zip**; see
+Future sharing builds use **release/LiStD-Mac.zip**. This source update has not
+replaced the existing public 1.4.1 archive; see
 [SHARING.md](SHARING.md). The sharing build is self-contained and uses each user's
 `~/Music/LiSTd` folder. It supports Intel and Apple Silicon Macs with macOS 14+;
 no recipient Python, Homebrew or Rosetta installation is needed.
@@ -16,14 +17,17 @@ no recipient Python, Homebrew or Rosetta installation is needed.
 
 On first launch, enter your Soulseek username and password. The account button in
 the toolbar is available in every skin for changing the account or signing out.
-LiSTd verifies sign-in using a print-only search, then saves the account in macOS
-Keychain. It does not download music during sign-in. Playback works without login.
+LiStD verifies sign-in using a print-only search, then saves the account in macOS
+Keychain. After replacing an ad-hoc build, macOS may need permission to read the
+saved entry. Choose **Unlock saved account** and complete macOS’s prompt. Startup
+never waits on that permission, and your saved entry is preserved.
+It does not download music during sign-in. Playback works without login.
 Close other Soulseek clients using that account before signing in or importing.
 
 ## Skins
 
 Use the **Skin** menu in the toolbar to switch between **Amped · Blue / Red**,
-**Silverwave**, **LiSTd · Original**, and **Signal · Dual Deck**. Amped recreates the supplied boombox reference:
+**Silverwave**, **LiStD · Original**, and **Signal · Dual Deck**. Amped recreates the supplied boombox reference:
 blue shell, red lettering, chrome controls and black speaker grilles. It is the initial
 skin for new preferences; your choice is saved. Skin changes preserve playback and
 imports. All skins use your supplied ear icon in Finder and the Dock. The speaker
@@ -32,14 +36,16 @@ LED spectrum. Silverwave's purple display remains decorative.
 
 The player fills most of the window by default. **Player size** changes the complete
 boombox's size; **Fill window** restores 100%. Size and drawer visibility are saved.
-Use **Tracks & imports** (or click the LiSTd logo) to expand the workspace. **New import**
-opens it automatically. Short press animations and smooth resizing/panel transitions
-respect macOS Reduce Motion.
+Use **Tracks & imports** (or click the LiStD logo) to expand the workspace. **New import**
+opens it automatically. Drag the vertical divider to resize the collection and the
+horizontal divider to resize the player and import drawer. Each area scrolls as
+needed; collapsing the drawer keeps playback, selection and import progress.
+Drawer transitions respect macOS Reduce Motion.
 
 ## Listen and change pitch / speed
 
-Click the play button beside a Library track or a ready import track to listen inside
-LiSTd. **Play in LiSTd** is also in each row's menu. The player's folder button opens
+Use the collection or accepted import row’s **A / B** loading buttons, then the
+deck’s Play button. **Play in LiStD** is also in the collection row’s context menu. The player's folder button opens
 a local audio file directly, without importing or moving it.
 
 Use play/pause, stop, the progress slider to seek and the volume slider. **Pitch / speed**
@@ -65,8 +71,8 @@ AVFoundation; an unreadable file shows a playback error.
 ## Signal · Dual Deck
 
 Choose **Skin → Signal · Dual Deck** for the dark technical mixer. The
-decks and mixer occupy the right two thirds of the window; the full-height collection
-and search occupy the left third. A/B buttons load tracks without leaving the list.
+decks and mixer occupy a resizable pane beside the full-height collection.
+The optional import drawer stays usable below the mixer. A/B buttons load tracks without leaving the list.
 The right side scrolls independently when the window is short. The
 waveforms use a 60 fps animation timeline and default to a shared 60-second time scale,
 with a full-track overview beneath each. **View** zooms both decks from 12 to 120 seconds
@@ -80,9 +86,9 @@ each deck also has independent play/pause, stop, level and mute.
 
 Beat analysis runs locally when a deck loads and refines the initial tempo over many
 beats to avoid drift from coarse BPM estimates. Uncertain grids ask for a manual
-cue. **Sync B → A** matches B’s tempo and beat
-phase to A. With A playing, it starts B in time; with A paused, it aligns B and leaves
-both paused. Sync is a one-time match: use it again after changing tempo or seeking.
+cue. **Sync A to B** changes A to match B’s effective tempo and beat phase;
+**Sync B to A** changes B to match A. The second deck stays unchanged. If that
+deck is playing, the changed deck starts aligned; otherwise it aligns paused. Sync is a one-time match: use it again after changing tempo or seeking.
 Check the estimated beats by ear. Correct **BPM** (or **Tap** it), click a kick in the
 waveform and use **Set beat** to anchor the grid. **½ / ×2** correct half/double BPM
 estimates. BPM displays two decimals; manual values are preserved during analysis.
@@ -100,6 +106,16 @@ Beat analysis uses an excerpt from the first 90 seconds and can miss the pulse o
 choose half/double tempo. Sync uses a fixed BPM, without downbeat/phrase detection
 or a continuous tempo lock. It can drift on live drums; correct it by listening and
 re-syncing. There is no headphone cue routing, key lock or recording/export.
+
+## Browse your collection
+
+**All tracks** is the default. Use **View** to browse Download folder, Import /
+tracklist, Genre or Artist, then choose a group. **Sort** offers Track title, Artist,
+BPM (unknown last) and Most recently added. Search stays within the selected group.
+These controls only change the display; they never move or copy music. Folder groups
+use current catalog paths; import groups use available history. Missing fields show
+Unknown artist, Unsorted or No import record. Older files use import/file creation
+time as an approximate added date.
 
 ## Drop a tracklist
 
@@ -167,6 +183,26 @@ already-downloaded review files locally. Original source text/CSV fields are ret
 Neither review action downloads anything. **Retry unfinished** starts a new search
 for the remaining tracks using the corrected order.
 
+## Deep search missing tracks
+
+The normal search runs first. For a Not found / Stopped row, choose **Deep search**.
+Use **Import actions → Deep search all missing** for the selected import. Accepted
+tracks and staged files awaiting review are preserved. **Stop** cancels the current
+search; each track shows query progress and its result.
+
+Deep search tries up to six sequential queries: normalized artist/title, reversed
+order, title only, supplied album/release/catalog details, and a query omitting one
+long word for small spelling differences. Original CSV fields, duration and mix cue
+positions remain intact. Format and bitrate requirements stay selected.
+
+Exact evidence can continue to download and full verification. Uncertain results
+expand under **candidates need review**, showing the filename/path, peer and reason.
+**Download & verify this candidate** requests a transfer; it still requires identity,
+duration, measured quality and complete decode before filing. A spelling difference
+or conflicting tags can therefore leave the file staged for Review file. Unrequested
+alternate versions are rejected. Deep search does not fingerprint audio and cannot
+guarantee that a peer has the requested recording.
+
 ## Genre and vibe limits
 
 Genre comes from the file's genre tag or your manual correction. Missing or
@@ -188,7 +224,7 @@ or perform recognition/fingerprinting on that mix.
 
 ## Files and credentials
 
-- `LiSTd.app`: universal native window for Intel/Apple Silicon (macOS 14+).
+- `LiStD.app`: universal native window for Intel/Apple Silicon (macOS 14+).
 - `native/Crate.swift`: window source.
 - `crate_backend.py`: parsing, queue, Sockseek integration, verification and folder results.
 - `music_sorter.py`: existing organizer, catalog and reversible move journal.
@@ -199,7 +235,7 @@ or perform recognition/fingerprinting on that mix.
   dependency versions. The first analysis after an update can take longer.
 
 The library refreshes every ten seconds while idle, every two seconds during imports,
-and immediately when LiSTd becomes active or a local action completes.
+and immediately when LiStD becomes active or a local action completes.
 
 The app stores its account in macOS Keychain and passes it privately over stdin to
 the backend. Sockseek uses a mode-600 temporary config within a mode-700 temporary
@@ -250,6 +286,12 @@ swiftc -parse-as-library native/CratePlayer.swift native/AudioSpectrum.swift tes
 .music-sorter/build/check-player
 swiftc -parse-as-library native/CratePlayer.swift native/AudioSpectrum.swift native/TechnicalSkin.swift tests/check_dual_deck.swift -o .music-sorter/build/check-dual-deck
 .music-sorter/build/check-dual-deck
+swiftc -parse-as-library native/SoulseekAccount.swift tests/check_keychain_startup.swift -o .music-sorter/build/check-keychain-startup
+.music-sorter/build/check-keychain-startup
+swiftc -parse-as-library native/Collection.swift tests/check_collection.swift -o .music-sorter/build/check-collection
+.music-sorter/build/check-collection
+swiftc -parse-as-library native/CratePlayer.swift native/AudioSpectrum.swift tests/check_sliders.swift -o .music-sorter/build/check-sliders
+.music-sorter/build/check-sliders
 swiftc -parse-as-library native/AudioSpectrum.swift tests/check_audio_spectrum.swift -o .music-sorter/build/check-spectrum
 .music-sorter/build/check-spectrum
 ```

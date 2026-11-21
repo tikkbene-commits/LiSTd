@@ -1,9 +1,9 @@
 # Bundled components
 
-LiSTd's original code is licensed under the MIT license in `LICENSE` at the repository
+LiStD's original code is licensed under the MIT license in `LICENSE` at the repository
 root. That license does not replace the individual licenses of the components below.
 
-LiSTd invokes unmodified Sockseek as a separate executable. Its release source and
+LiStD invokes unmodified Sockseek as a separate executable. Its release source and
 license are in Sources/sockseek-3.0.6-source.tar.gz (AGPL-3.0).
 Upstream: https://github.com/fiso64/sockseek/tree/v3.0.6
 
@@ -18,5 +18,5 @@ The frozen backend embeds CPython 3.9.6 and librosa 0.11.0 with its numerical/au
 dependencies for each architecture. Python and individual distribution notices are
 in Licenses/arm64 and Licenses/x86_64; metadata
 includes versions and upstream project links. PyInstaller uses its bootloader
-exception for packaged applications. The LiSTd build sources and dependency files
+exception for packaged applications. The LiStD build sources and dependency files
 are included in Sources/ for inspection and rebuilding.

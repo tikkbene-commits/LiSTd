@@ -1,4 +1,4 @@
-# LiSTd project handoff
+# LiStD project handoff
 
 Read this before editing the app in a new chat. This is durable project context,
 not a copy of the conversation. Update it when the implementation or decisions change;
@@ -7,7 +7,7 @@ and state before relying on the snapshot below.
 
 ## Purpose and user preferences
 
-LiSTd (formerly Crate) is a native macOS app for turning a supplied DJ-set tracklist into downloaded,
+LiStD (formerly Crate) is a native macOS app for turning a supplied DJ-set tracklist into downloaded,
 verified tracks organized for selecting music for future sets. The intended flow is
 drop a tracklist, download through Sockseek, verify, sort, then show which folders
 received new tracks. Keep that flow as automatic as practical and available through
@@ -15,7 +15,7 @@ the graphical window, without requiring routine Terminal use.
 
 - The development workspace is `/Users/tikkbene/Desktop/MUSIC`; its root app stays
   beside Python source. `./package-crate` builds a separate self-contained sharing
-  universal archive at `release/LiSTd-Mac.zip`, for Intel/Apple Silicon and macOS 14+.
+  universal archive at `release/LiStD-Mac.zip`, for Intel/Apple Silicon and macOS 14+.
   The release app uses `~/Music/LiSTd` for each recipient's data and downloads.
 - Move audio files instead of creating copies. Never change `juan music` without an
   explicit request. Reuse qualifying existing files rather than downloading again.
@@ -30,145 +30,124 @@ the graphical window, without requiring routine Terminal use.
 - The app starts with 320 kbps or lossless as its quality setting; the user can choose
   a different threshold. Never silently lower it or substitute an alternate mix.
 
-## Current interface
+## Current interface (LiStD 1.5 source)
 
-The native window has Import tracklist, New arrivals and Library views, an import
-history, per-track outcomes, Finder reveal/open-folder actions, internal audio
-playback, and manual genre/vibe corrections. Automatic import can be
-turned off to inspect a queue before starting downloads.
+The exact public brand is **LiStD**. `build-crate` produces `LiStD.app` and
+`package-crate` now targets `LiStD-Mac.zip`. The public 1.4.1 release and remote
+repository have not been renamed or replaced by this work. Keep `local.music.crate`,
+Keychain service `local.music.crate.soulseek`, `crate.skin`, `listd.*` preferences,
+`LiSTdStandalone`, `~/Music/LiSTd`, existing cache roots and `.music-sorter/` paths
+stable for compatibility. The bundle/executable spelling was checked on this case-insensitive macOS volume.
+Startup reads Keychain with authentication UI disabled. A rebuilt ad-hoc app can
+need reauthorization; its account sheet offers **Unlock saved account**, which
+requests the same existing entry on a background task. This keeps startup/playback
+usable without bypassing macOS approval or changing/deleting stored credentials.
 
-The current source includes four selectable skins:
+Every skin has the same resizable collection pane on the left, and a player above
+a collapsible **Tracks & imports** drawer on the right. Native `HSplitView` and
+`VSplitView` dividers resize actual content. The collection has a 310-point minimum;
+the player/drawer have a 440-point minimum width, with independently scrolling
+collection, Signal mixer and import content. The window minimum is 800 × 620 (800 × 720 for Amped, whose player minimum is
+400 points; 800 × 680 for Silverwave, whose player minimum is 340 points).
+Players honor the window’s measured top safe-area inset; the lower import pane
+does not inherit the top window inset. Amped keeps native transport controls available even when its artwork
+is deliberately reduced, and clips the artwork to its allocated canvas.
+New import opens the drawer directly. The drawer shows the import picker, current
+queue, per-track results, progress, Stop, review/retry actions and New arrivals.
+It is nonmodal. Account, label and staged-file review dialogs remain sheets.
+The root owns both players and the import model, so changing pane sizes or drawer
+visibility does not recreate playback or cancel imports. Collection selection,
+search, filters and sort live in the root, too.
 
-- **Amped · Blue / Red**, the initial skin: a vector recreation of the user's boombox
-  reference, with its green shell changed to blue and blue lettering changed to red.
-  It has chrome rims, black mesh speakers, a black LCD with live LEDs, central transport buttons and a
-  draggable pitch fader. Implemented in `native/BoomboxSkin.swift`.
+The four retained skins are **Amped · Blue / Red**, **Signal · Dual Deck**,
+**Silverwave**, and **LiStD · Original**. Amped retains its vector boombox, live
+spectrum, chrome transport, shell/side/speaker/vent actions and vertical pitch
+fader. Player size still controls the artwork's fit within its real player pane.
+Silverwave retains its silver/purple panel and decorative display; Original uses
+native controls. The ear icon remains `native/Assets/EarIcon.icns`.
 
-- **Signal · Dual Deck**: a dark, minimal technical view with stacked green waveforms,
-  independent A/B playback, three-band cut EQ, beat analysis and B-to-A tempo/phase sync.
-  Implemented in `native/TechnicalSkin.swift`.
+All horizontal controls use `StableSlider` in `native/CratePlayer.swift`: one native
+NSSlider owns drawing and tracking, avoiding SwiftUI's separate tracking overlay
+and inherited layout animations. The native vertical boombox fader retains actual
+rendered dimensions. No whole-layout animation follows player-size values.
+Stepped sliders quantize at their original increments; keyboard arrows and
+accessibility increment/decrement work. Seek commits on mouse/keyboard/accessibility
+edit completion. The reported transient upper-left jump was not caught in the
+initial UI capture; do not claim a frame-by-frame reproduction from that capture.
 
-- **Silverwave**: silver/purple styling inspired by early Windows
-  Media Player, implemented in `native/CrateSkin.swift`.
-- **LiSTd · Original**, the original native macOS presentation.
+## Collection browsing
 
-The toolbar Skin picker saves its selection with `@AppStorage("crate.skin")`. Changing
-the skin changes the window without interrupting playback or imports. All skins use
-the user's supplied ear icon in the Dock and Finder; its durable source is
-`native/Assets/EarIcon.icns`. Retained icon generators still build the earlier resources.
-The Silverwave purple display remains decorative. The boombox LCD has a real
-32-band logarithmic audio spectrum behind the title: green/yellow/orange/red LED
-segments and a faint reflection, based on the playing audio rather than random bars.
-Click the LCD to toggle it. It is blank when paused/stopped and respects Reduce Motion.
-Preserve all four skins during unrelated edits.
+**All tracks** is the default, sorted naturally by **Track title**. View options are
+All tracks, Download folder, Import / tracklist, Genre and Artist. Grouped views
+expose an All groups / named group picker. Sorting also supports Artist, BPM
+(unknown last) and Most recently added (newest first). Search applies inside the
+chosen group. A/B loading, file-URL row dragging, Finder reveal, playback and manual
+label editing remain available. Label editing is still an explicit disk-changing
+action; browsing/sorting never invokes the organizer.
 
-Amped now gives most of the window to the player by default. A saved **Player size**
-slider scales the whole device from 45% to 100%; **Fill window** restores 100%.
-**Tracks & imports** opens/closes a drawer with the existing workspace. New import
-opens it automatically; clicking the LiSTd logo also toggles it. The drawer and size
-preferences use `listd.showWorkspace` / `listd.playerSize`. Button presses have short
-spring/highlight feedback; resize and drawer transitions animate with Reduce Motion
-respected. All visible control areas have actions and accessibility/help labels:
-top switches = mute, minimize, close; side controls = volume down/up; speakers =
-back/forward 10 seconds; vents = pitch down/up; shell = play/pause (or open audio when
-empty); LCD = spectrum toggle; center = transport, open file and pitch fader.
-The artwork canvas renders at its final size to stay sharp. The native pitch fader
-also receives its actual rendered dimensions instead of a transformed small view,
-keeping mouse tracking calibrated as the player is resized. Its chrome thumb is an
-NSSliderCell drawing; the native control retains keyboard/accessibility behavior.
-
-The displayed brand, app bundle and executable are now LiSTd. Source filenames,
-`build-crate`, the `local.music.crate` bundle identifier, `crate.skin` preference and
-`.music-sorter/crate` data paths deliberately remain stable, preserving saved imports
-and skin selection. The previous app was archived in
-`.music-sorter/build/before-listd/Crate.app`; use the root `LiSTd.app` for normal use.
-
-Playback uses AVAudioEngine → AVAudioPlayerNode → AVAudioUnitVarispeed → AVAudioUnitEQ → mixer/output
-in `native/CratePlayer.swift`. A tap after EQ and before the output volume feeds
-`native/AudioSpectrum.swift`: a Hann-windowed 2048-point Accelerate DFT, 40 Hz–16 kHz
-log bands, a lock-protected snapshot and a 24 fps display. The louder channel is used
-so channel cancellation or a silent left channel cannot hide the spectrum. Volume and
-mute affect listening; the pre-volume spectrum continues to show the playing signal.
-Library and accepted import rows play directly inside
-LiSTd; Open audio file also plays a local file without importing, sorting or copying it.
-Controls include play/pause, stop, seek, volume and 0.5×–1.5× speed. Pitch follows speed
-like a turntable; the UI displays the percentage and semitone change. Reset restores
-1×. The boombox additionally has ±10-second buttons and a vertical pitch fader.
-All skins share deck A for the window; Signal adds an independent deck B. Rate/volume persist across skin changes
-within the session. Playback does not modify audio files, tags or the organizer catalog.
-There is no automatic next-track queue, independent key lock or audio export.
+`native/Collection.swift` holds the read-only display calculation. Snapshot metadata
+derives folder groups from the current parent under downloads (or Outside downloads)
+and import groups from matching catalog IDs / recorded paths. Import labels include
+a short ID to distinguish identically named lists. Missing membership is No import
+record; missing artist/genre is Unknown artist / Unsorted. New catalog entries store
+`added_at`; old catalogs fall back to the earliest associated import's creation time,
+then file birth time (mtime on platforms without birth time). This is an approximation
+for legacy files and does not trigger a scan or mutate the catalog.
 
 ## Signal dual-deck auditioning
 
-Signal is a fourth skin, selected with the existing Skin menu. Load a library track
-with its A/B button, or use the deck’s Open file button; these load paused and do
-not import, move, download or edit the source. The collection occupies the left third
-of the window at full height, with search, two-line title/artist/genre rows, BPM and
-A/B loading. The decks and EQ occupy the right two thirds in an independent vertical
-scroll view. Header/transport/tempo controls use separate rows to fit the narrower
-column; the ratio follows window resizing. Waveforms stream from AVAudioFile
-on a background task, with bounded peak storage (up to 120,000 bins). Compact stacked
-windows default to 60 seconds on the same wall-clock scale; the shared View slider
-zooms from 12 to 120 seconds and persists as `listd.waveformSeconds`. Detail/overview
-heights are 44/18 points, with reduced detail amplitude. Overviews seek anywhere in each file. Waveforms
-use a 60 fps SwiftUI animation timeline and interpolate the audio render timestamp
-against the host clock. Transport labels publish at 10 Hz so the collection table
-is not rebuilt 60 times per second. Waveform bins stay anchored to the audio while
-scrolling, rendered as a filled envelope instead of moving thin bars to reduce subpixel
-shimmer; drawing is clipped to each lane. Reduce Motion uses stationary
-waveform pages with a moving playhead.
+Both decks have compact stacked detail/overview waveforms, local beat analysis,
+independent transport, original BPM/tap/half/double, ±20 ms nudges, beat cue,
+0.5–1.5× varispeed and bass/mid/high cut EQ (0 to −24 dB), level and mute.
+Control grids wrap as the pane narrows; the mixer scrolls vertically. Waveforms
+resize to the available width. View zoom (12–120 seconds) persists in
+`listd.waveformSeconds`. The original 60 fps interpolated waveform, bounded
+background waveform reader, Reduce Motion paging, 10 Hz position publication,
+manual BPM/cue preservation and read-only analysis remain.
 
-Signal collection rows export file URLs through native table row item providers,
-with native row selection enabled.
-Drop one local audio file (from the collection or Finder) onto either waveform lane
-to load that deck paused; this triggers the existing read-only beat analysis.
-Unsupported/nonlocal/multiple-file drops are rejected. A/B buttons and file pickers
-remain available.
-The file-URL provider and audio type checks were verified, but automated native
-drag gestures did not confirm an end-to-end drop in this session. A/B loading was
-verified in the actual app; do not describe drag-and-drop as UI-verified yet.
+**Sync A to B** calls `a.sync(to: b)`; **Sync B to A** calls `b.sync(to: a)`.
+The first named deck changes; the second remains unchanged. Both reuse the same
+rate bounds, valid BPM/cue checks and shared future host timestamp. With the target
+playing, the follower starts aligned; with it paused, the follower aligns paused.
+Sync is one-time tempo/beat phase alignment, without continuous locking, downbeat
+or phrase detection. Beats are estimates and fixed-tempo tracks can still drift.
+Leaving Signal pauses B; A continues with its settings. Loading and analysis do not
+modify audio, tags, catalog or folders. There is no key lock, headphone cue routing,
+controller integration, automatic next-track queue, recording or export.
 
-Each deck has play/pause, stop, seek, ±20 ms nudges, original BPM entry, tap tempo,
-0.5×–1.5× varispeed, beat cue and independent level/mute. Separate low-shelf (250 Hz),
-parametric mid (1 kHz, two octaves) and high-shelf (4 kHz) filters cut from 0 to −24 dB.
-Reset EQ restores all three bands. First opening Signal caps A at 50% and starts B at
-50% for mixing headroom; raising both levels can clip their combined output.
+## Optional deep searching
 
-Loading a deck in Signal requests the read-only backend
-`deck-analysis PATH [--bpm N] [--refine-bpm]`. Catalog BPM or the existing spectral
-estimator provides an initial tempo. Local librosa detects beats in the first 90
-seconds, then short-window period estimates and strong onsets fit a fractional BPM
-and grid anchor. Grid numbers are reassigned during fitting so a spurious/missing
-beat in a breakdown cannot shift every later beat. Uncertain grids leave the cue
-unset instead of enabling misleading sync. The estimate remains a fixed tempo.
-It writes no audio,
-catalog, tags or beat grid. Analysis failures leave manual BPM/tap and Set beat usable.
-A newly loaded file invalidates stale analysis responses; manual BPM/cue edits are not
-overwritten by an in-flight analysis. Manual BPM entry, Tap and half/double buttons
-mark BPM as manual (`bpmIsEstimate = false`); later analysis preserves that exact BPM
-and checks/fits only its cue. BPM readouts show two decimals, while sync uses the full
-precision. Beat cues and BPM corrections are session-only.
+The normal first search is unchanged. A missing row offers **Deep search**, and
+**Import actions → Deep search all missing** retries the current import's missing
+rows. Staged review files and accepted rows are excluded. Candidate review lists can
+be searched again; selecting a candidate requests its download through normal
+verification, and does not approve its identity or waive quality checks.
 
-Sync B → A applies A’s effective BPM to B and seeks B to the nearest matching beat
-phase, starting it at a host timestamp 120 ms ahead when A is playing. The master’s
-position is projected to that exact timestamp, including pending scheduled starts;
-the playback clock stays stationary until its scheduled host start. With A paused,
-it aligns B without starting either deck. Play both schedules the two decks at one
-host timestamp. Sync is a one-time alignment, not a continuously locked or downbeat/
-phrase-aware grid. BPM and the estimated cue can be wrong, including half/double tempo;
-fixed-tempo alignment can drift on live drums. Check by ear, adjust BPM, Set beat on a
-kick, nudge or re-sync. Pitch follows tempo; no key lock, headphone cue routing, DJ
-controller integration, recording or export was added.
+`run ID --deep [--index N] [--candidate N]` uses the existing lock, private account
+config, one app-owned loopback Sockseek session, cancellation file and sequential
+worker. A row has at most six sequential fallback queries (45 seconds per command,
+eight-second Soulseek search), at most 200 inspected results/query, 20 review
+candidates and three transfer attempts. Logs stop at 8 MB. Queries normalize accents,
+punctuation and spacing; vary artist/title order; focus title; use supplied
+Album/Release/Catalog fields; and may omit one long word to retrieve spelling
+variants. Each query uses a separate one-row CSV with the original full-track
+length. `input.csv`, original imported fields and SetStart cues are not rewritten.
 
-Leaving Signal pauses B so a hidden deck cannot keep playing; A continues and retains
-its EQ, rate and level. Returning preserves both loaded tracks within the session.
-Tracks & imports opens the existing workspace in a sheet, and New import opens it at
-the import form. No download starts merely by opening the sheet or switching skins.
+`deep_identity` permits exact artist/title/release combinations and unexpected
+metadata placement. Unexplained words, conflicting tags and conservative spelling
+variants require review. Unrequested remix/edit/live/dub/radio/other version words
+are rejected, and never excused by album metadata. Confident results still pass the
+completion hook's local identity, supplied duration, accepted codec, measured bitrate
+and full decode before sorting. Fuzzy filenames are never automatically accepted.
+No audio fingerprinting or automatic spell correction of imported metadata exists.
+The real mock daemon/CLI fallback/transfer/hook/sorter path is tested offline;
+live peer availability and rate limits remain dependent on Soulseek.
 
 ## Source map and callers
 
 | File | Responsibility |
 | --- | --- |
+| `native/Collection.swift` | Collection metadata model and pure filtering/grouping/sorting |
 | `native/Crate.swift` | SwiftUI window, state polling, import controls, queue/folder/library views, label actions, process launch and skin selection |
 | `native/SoulseekAccount.swift` | Codable account and native Security.framework Keychain storage |
 | `native/CrateSkin.swift` | Skin enum, Silverwave panels, emblem and decorative display |
@@ -234,7 +213,7 @@ every two seconds during imports, and runs every ten seconds when idle, with an
 immediate refresh on app activation and local actions. Unchanged jobs/library arrays
 are not republished, avoiding unnecessary collection redraws.
 
-Source history is in the private repository https://github.com/tikkbene-commits/LiSTd.
+Source history is in the repository https://github.com/tikkbene-commits/LiSTd.
 The baseline precedes the 1.4.1 stability changes. Music, personal root playlists,
 credentials/config, state, environments, generated app bundles and releases are
 excluded from Git. The supplied sample tracklist remains a source fixture.
@@ -242,10 +221,9 @@ excluded from Git. The supplied sample tracklist remains a source fixture.
 Public-facing documentation is in `README.md` and the friend-oriented `INSTALL.md`.
 The README has Amped/Signal previews rendered from real views with generated example
 audio by `scripts/render_readme.swift`; it does not show a personal library/account.
-Original LiSTd code is MIT licensed (`LICENSE`, copyright Benedek Tikk); dependency
+Original LiStD code is MIT licensed (`LICENSE`, copyright Benedek Tikk); dependency
 licenses remain separate. The v1.4.1 GitHub release provides the unchanged tested
-Mac ZIP, SHA256SUMS.txt and LICENSE. Repository visibility remains private pending
-the user's publication decision. Download links use GitHub Releases, not source ZIPs.
+Mac ZIP, SHA256SUMS.txt and LICENSE. The user reports the app is now public; this work does not change repository visibility. Download links use GitHub Releases, not source ZIPs.
 Separate Sockseek installation is only for source development/standalone CLI use;
 README Requirements links upstream and the tested 3.0.6 Mac archives, with a manual
 one-line install command after extraction. Do not invent an upstream shell installer:
@@ -334,10 +312,25 @@ not be treated as a failed login.
 
 ## Evidence boundaries and known limitations
 
-- Deferred UI bug, user-reported 2026-11-18: clicking sliders briefly makes them
-  animate/jump down from the top of the screen for about a second. Record this for
-  the next project session; the user explicitly requested no investigation or fix
-  now. Affected sliders/skins and the cause have not been verified.
+- A renamed/rebuilt ad-hoc development app may need macOS approval for Desktop files
+  and the existing Keychain entry. Startup suppresses legacy Keychain UI, preserving
+  the window and stored entry; Unlock saved account requests authorization explicitly.
+  The legacy no-UI guard uses deprecated SecKeychain APIs because modern flags did
+  not suppress this existing store's authorization prompt; migrate only deliberately.
+- macOS file access was approved during the 1.5 UI follow-up. On November 21, the
+  final rebuilt binary displayed all 155 existing tracks and the original import
+  history in Signal, including visible A/B buttons at the narrow window size and
+  an independently resized import drawer. Silverwave, Amped and Original layouts
+  were also inspected during the follow-up. No scan/reorganization was needed.
+- Native slider tracking sends its final snapped value again after AppKit finishes
+  mouse tracking, keeping the thumb, accessibility value and displayed value equal.
+  Actual waveform-zoom clicking and keyboard stepping verified this final fix.
+- The collection title column now follows its pane's actual width, reserving room
+  for BPM and A/B buttons. Amped's vertical fader uses the shared first-responder
+  slider class with its original chrome cell; its focus and accessibility increments
+  passed a native hosted-control regression check. Final automated pointer dragging
+  of that custom fader was blocked by the UI driver's noWindowsAvailable error.
+
 - Genre is a file tag or manual label. Missing/conflicting genre tags remain `Unsorted`.
   No trained audio genre/mood model is installed.
 - Librosa estimates tempo from three 24-second excerpts, with agreement/pulse checks;
@@ -346,7 +339,7 @@ not be treated as a failed login.
   heuristic, not a guaranteed musical judgment or a DJ beat grid.
 - The YouTube URL is a source link for the provided list. The app does not recognize
   tracks by fingerprinting the set or download the YouTube mix itself.
-- Share only `release/LiSTd-Mac.zip`, not the development root app or MUSIC
+- Share only `release/LiStD-Mac.zip`, not the development root app or MUSIC
   folder. No Developer ID certificate was available for this build: ad-hoc signing
   cannot remove Gatekeeper first-open approval. See SHARING.md for optional signing
   and notarization. Windows is unsupported. Intel code is checked under Rosetta on

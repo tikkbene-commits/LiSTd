@@ -15,7 +15,16 @@ struct Track: Decodable, Identifiable, Equatable {
     let bpm: Double?
     let quality: String?
     let track_id: String?
+    let candidates: [SearchCandidate]?
     var id: Int { index }
+}
+
+struct SearchCandidate: Decodable, Identifiable, Equatable {
+    let filename: String
+    let username: String
+    let reason: String
+    let number: Int
+    var id: Int { number }
 }
 
 struct ImportJob: Decodable, Identifiable, Equatable {
@@ -28,16 +37,6 @@ struct ImportJob: Decodable, Identifiable, Equatable {
     let tracks: [Track]
     var ready: Int { tracks.filter { ["ready", "existing"].contains($0.status) }.count }
     var attention: Int { tracks.filter { ["unavailable", "review", "stopped"].contains($0.status) }.count }
-}
-
-struct LibraryTrack: Decodable, Identifiable, Equatable {
-    let id: String
-    let artist: String
-    let title: String
-    let genre: String
-    let vibe: String
-    let bpm: Double?
-    let path: String
 }
 
 struct Snapshot: Decodable {
@@ -86,6 +85,7 @@ struct ReviewAudioInfo: Decodable {
     @Published var signingIn = false
     @Published var accountError: String?
     @Published var accountUsername = ""
+    @Published var accountNeedsUnlock = false
     private var account: SoulseekAccount?
     var fetching = false
     var initialized = false
@@ -110,10 +110,32 @@ struct ReviewAudioInfo: Decodable {
         }
         do {
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-            account = try SoulseekKeychain.load()
+            account = try SoulseekKeychain.load(allowInteraction: false)
             accountUsername = account?.username ?? ""
             configured = account != nil
-        } catch { accountError = error.localizedDescription }
+        } catch {
+            accountNeedsUnlock = true
+            accountError = "macOS needs permission to read the saved account. Choose Unlock saved account; your existing Keychain entry is preserved."
+        }
+    }
+
+    func unlockAccount() {
+        guard !signingIn else { return }
+        signingIn = true
+        Task.detached {
+            let result = Result { try SoulseekKeychain.load() }
+            await MainActor.run {
+                self.signingIn = false
+                do {
+                    self.account = try result.get()
+                    self.accountUsername = self.account?.username ?? ""
+                    self.configured = self.account != nil
+                    self.accountNeedsUnlock = false
+                    self.accountError = nil
+                    if self.configured { self.showAccount = false; self.refresh() }
+                } catch { self.accountError = error.localizedDescription }
+            }
+        }
     }
 
     func request(_ arguments: [String], input: String? = nil, done: @escaping (Result<Data, Error>) -> Void) {
@@ -124,7 +146,7 @@ struct ReviewAudioInfo: Decodable {
                 let audioPython = project.appendingPathComponent(".music-sorter/audio-env/bin/python")
                 let bundled = Self.bundledBackend
                 if Bundle.main.object(forInfoDictionaryKey: "LiSTdStandalone") as? Bool == true && bundled == nil {
-                    throw NSError(domain: "Crate", code: 1, userInfo: [NSLocalizedDescriptionKey: "LiSTd’s bundled tools are missing. Extract the complete app from the ZIP and try again."])
+                    throw NSError(domain: "Crate", code: 1, userInfo: [NSLocalizedDescriptionKey: "LiStD’s bundled tools are missing. Extract the complete app from the ZIP and try again."])
                 }
                 process.executableURL = bundled ?? (FileManager.default.isExecutableFile(atPath: audioPython.path) ? audioPython : URL(fileURLWithPath: "/usr/bin/python3"))
                 process.arguments = (bundled == nil ? [project.appendingPathComponent("crate_backend.py").path] : []) + ["--root", project.path] + arguments
@@ -203,19 +225,25 @@ struct ReviewAudioInfo: Decodable {
         }
     }
 
-    func start(_ id: String) {
+    func start(_ id: String, deep: Bool = false, index: Int? = nil, candidate: Int? = nil) {
         guard let account else {
+            if deep { error = "Sign in, then choose Deep search again."; showAccount = true; return }
             if !pending.contains(id) { pending.append(id) }
             showAccount = true
             return
         }
         guard !working && !jobs.contains(where: { $0.status == "running" }) else {
+            if deep { error = "Wait for the current import or stop it before deep searching."; return }
             if !pending.contains(id) { pending.append(id) }
             return
         }
         working = true
         let input = String(data: try! JSONEncoder().encode(account), encoding: .utf8)!
-        request(["run", id], input: input) { result in
+        var arguments = ["run", id]
+        if deep { arguments.append("--deep") }
+        if let index { arguments += ["--index", String(index)] }
+        if let candidate { arguments += ["--candidate", String(candidate)] }
+        request(arguments, input: input) { result in
             self.working = false
             if case .failure(let failure) = result { self.error = failure.localizedDescription }
             self.refresh()
@@ -260,6 +288,7 @@ struct ReviewAudioInfo: Decodable {
                 self.account = candidate
                 self.accountUsername = candidate.username
                 self.configured = true
+                self.accountNeedsUnlock = false
                 self.showAccount = false
                 self.refresh()
             } catch { self.accountError = error.localizedDescription }
@@ -335,7 +364,6 @@ struct CrateView: View {
     @StateObject var model = CrateModel()
     @StateObject var player = CratePlayer()
     @StateObject var deckB = CratePlayer()
-    @State private var showTechnicalWorkspace = false
     @State private var technicalOpened = false
     @AppStorage("crate.skin") private var skin = CrateSkin.boombox
     @AppStorage("listd.playerSize") private var playerSize = 1.0
@@ -350,38 +378,45 @@ struct CrateView: View {
     @State private var targeted = false
     @State private var search = ""
     @State private var technicalSelection: LibraryTrack.ID?
+    @State private var collectionView = "All tracks"
+    @State private var collectionGroup = ""
+    @State private var collectionSort = "Track title"
     @State private var folderJobID: String?
     let timer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     var selectedJob: ImportJob? { model.jobs.first { $0.id == model.selection } }
 
     var body: some View {
-        Group {
-            if skin == .boombox {
-                boombox
-            } else if skin == .technical {
-                technical
-            } else if skin == .silverwave {
-                silverwave
-            } else {
-                NavigationSplitView {
-                    sidebar.navigationSplitViewColumnWidth(min: 215, ideal: 230, max: 280)
-                } detail: {
-                    workspace.background(Color(nsColor: .windowBackgroundColor))
+        GeometryReader { geometry in
+        HSplitView {
+            technicalCollection.frame(minWidth: 310, idealWidth: 390, maxWidth: 650)
+            VSplitView {
+                mixer.padding(.top, geometry.safeAreaInsets.top)
+                    .frame(minWidth: 440, minHeight: skin == .boombox ? 400 : skin == .silverwave ? 340 : 230, maxHeight: .infinity)
+                if showWorkspace {
+                    importDrawer.ignoresSafeArea(.container, edges: .top)
+                        .frame(minWidth: 440, minHeight: 240, idealHeight: 340)
+                        .transition(.move(edge: .bottom))
                 }
-            }
+            }.frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
         }
         .tint(skin.accent)
         .preferredColorScheme(skin == .technical ? .dark : skin == .classic ? nil : .light)
-        .frame(minWidth: 1080, minHeight: skin == .boombox ? 820 : 780)
+        .frame(minWidth: 800, minHeight: skin == .boombox ? 720 : skin == .silverwave ? 680 : 620)
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 Button { model.showAccount = true } label: { Label(model.configured ? model.accountUsername : "Sign in to Soulseek", systemImage: "person.crop.circle") }
                 .disabled(model.working || model.signingIn || model.jobs.contains(where: { $0.status == "running" }))
             }
             ToolbarItem(placement: .automatic) { skinPicker }
+            ToolbarItem(placement: .automatic) {
+                Button { withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) { showWorkspace.toggle() } } label: {
+                    Label("Tracks & imports", systemImage: "sidebar.trailing")
+                }.help("Show or collapse the resizable import drawer")
+            }
             ToolbarItem(placement: .primaryAction) {
-                Button { model.selection = "import"; showWorkspace = true; if skin == .technical { showTechnicalWorkspace = true } } label: { Label("New import", systemImage: "plus") }
+                Button { model.selection = "import"; showWorkspace = true } label: { Label("New import", systemImage: "plus") }
                 .keyboardShortcut("n", modifiers: .command)
             }
         }
@@ -404,13 +439,7 @@ struct CrateView: View {
         }
         .sheet(item: $model.editing) { edit in LabelEditor(track: edit, save: model.saveLabels) }
         .sheet(isPresented: $model.showAccount) { SoulseekAccountPanel(model: model) }
-        .sheet(isPresented: $showTechnicalWorkspace) {
-            VStack(spacing: 0) {
-                HStack { Text("Tracks & imports").font(.headline); Spacer(); Button("Done") { showTechnicalWorkspace = false } }.padding()
-                NavigationSplitView { sidebar } detail: { workspace }
-            }.frame(width: 1050, height: 680)
-        }
-        .alert("LiSTd needs your attention", isPresented: Binding(get: { model.error != nil || player.error != nil || deckB.error != nil }, set: { if !$0 { model.error = nil; player.error = nil; deckB.error = nil } })) {
+        .alert("LiStD needs your attention", isPresented: Binding(get: { model.error != nil || player.error != nil || deckB.error != nil }, set: { if !$0 { model.error = nil; player.error = nil; deckB.error = nil } })) {
             Button("OK") { model.error = nil; player.error = nil; deckB.error = nil }
         } message: { Text(model.error ?? player.error ?? deckB.error ?? "") }
     }
@@ -450,38 +479,85 @@ struct CrateView: View {
         }
     }
 
-    var technical: some View {
-        GeometryReader { geometry in
-            HStack(spacing: 0) {
-                technicalCollection.frame(width: (geometry.size.width - 1) / 3)
-                Rectangle().fill(TechnicalPlayer.line).frame(width: 1)
-                ScrollView(.vertical) {
-                    TechnicalPlayer(a: player, b: deckB, analyze: analyzeDeck)
-                        .frame(maxWidth: .infinity)
-                }.frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }.background(Color(red: 0.055, green: 0.065, blue: 0.061))
+    @ViewBuilder var mixer: some View {
+        if skin == .technical {
+            ScrollView(.vertical) { TechnicalPlayer(a: player, b: deckB, analyze: analyzeDeck).frame(maxWidth: .infinity) }
+        } else if skin == .boombox { boombox }
+        else if skin == .silverwave {
+            VStack(spacing: 12) {
+                SilverwaveDisplay(title: player.title, subtitle: player.artist, count: "LiStD · SILVERWAVE")
+                Spacer(minLength: 0)
+                PlaybackStrip(player: player)
+            }.padding(14).modifier(MetalPanel(radius: 18))
+        } else {
+            VStack {
+                Text("LiStD").font(.largeTitle)
+                Text(player.title).font(.title2).lineLimit(2)
+                Text(player.artist).foregroundStyle(.secondary).lineLimit(2)
+                Spacer(minLength: 0)
+                PlaybackStrip(player: player)
+            }.padding()
+        }
+    }
+
+    var importDrawer: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Tracks & imports").font(.headline)
+                Spacer()
+                Button("Collapse") { showWorkspace = false }
+            }.padding(12)
+            HStack {
+                Picker("Show", selection: $model.selection) {
+                    Text("New import").tag("import")
+                    Text("New arrivals").tag("folders")
+                    ForEach(model.jobs) { job in
+                        Text("\(job.name) · \(job.ready)/\(job.tracks.count)").tag(job.id)
+                    }
+                }.labelsHidden().frame(maxWidth: .infinity)
+                if model.jobs.contains(where: { $0.status == "running" }) { ProgressView().controlSize(.small) }
+            }.padding(.horizontal, 12).padding(.bottom, 8)
+            Divider()
+            workspace
+        }.background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    var browser: CollectionBrowser {
+        CollectionBrowser(tracks: model.library, collectionView: collectionView, collectionGroup: collectionGroup,
+                          collectionSort: collectionSort, search: search)
     }
 
     var technicalCollection: some View {
-        let filtered = model.library.filter { search.isEmpty || "\($0.title) \($0.artist) \($0.genre) \($0.vibe)".localizedCaseInsensitiveContains(search) }
-        return VStack(spacing: 0) {
+        let filtered = browser.visibleTracks
+        let groupNames = Array(Set(model.library.flatMap { browser.groups(for: $0) })).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        return GeometryReader { geometry in
+        VStack(spacing: 8) {
             HStack {
                 Text("COLLECTION").tracking(2).font(.system(size: 10, weight: .medium, design: .monospaced))
-                Text("\(model.library.count)").font(.system(size: 10, design: .monospaced)).foregroundStyle(TechnicalPlayer.dim)
-                Spacer(minLength: 8)
-                Button("Tracks & imports") { showTechnicalWorkspace = true }.controlSize(.small)
-            }.padding(.top, 17)
-            TextField("Search tracks, artists, genres", text: $search)
-                .textFieldStyle(.roundedBorder).padding(.bottom, 12)
+                Spacer()
+                Text("\(filtered.count) / \(model.library.count)").font(.caption).foregroundStyle(.secondary)
+            }
+            Picker("View", selection: $collectionView) {
+                ForEach(["All tracks", "Download folder", "Import / tracklist", "Genre", "Artist"], id: \.self) { Text($0) }
+            }.onChange(of: collectionView) { _, _ in collectionGroup = "" }
+            if collectionView != "All tracks" {
+                Picker(collectionView, selection: $collectionGroup) {
+                    Text("All groups").tag("")
+                    ForEach(groupNames, id: \.self) { Text($0).tag($0) }
+                }.help("Filter the collection by \(collectionView.lowercased()); files stay in place")
+            }
+            Picker("Sort", selection: $collectionSort) {
+                ForEach(["Track title", "Artist", "BPM", "Most recently added"], id: \.self) { Text($0) }
+            }
+            TextField("Search this view", text: $search).textFieldStyle(.roundedBorder)
             Table(of: LibraryTrack.self, selection: $technicalSelection) {
                 TableColumn("Track") { track in
                     VStack(alignment: .leading, spacing: 4) {
                         Text(track.title).lineLimit(1)
-                        Text("\(track.artist) · \(track.genre)").font(.system(size: 10))
-                            .foregroundStyle(TechnicalPlayer.dim).lineLimit(1)
+                        Text("\(track.artist.isEmpty ? "Unknown artist" : track.artist) · \(track.genre)")
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }.padding(.vertical, 5).help("\(track.artist) — \(track.title) / \(track.genre)")
-                }.width(min: 135, ideal: 230)
+                }.width(max(80, geometry.size.width - 200))
                 TableColumn("BPM") { track in Text(track.bpm.map { String(format: "%.1f", $0) } ?? "—").monospacedDigit() }.width(44)
                 TableColumn("Deck") { track in
                     HStack(spacing: 5) {
@@ -492,9 +568,17 @@ struct CrateView: View {
             } rows: {
                 ForEach(filtered) { track in
                     TableRow(track).itemProvider { NSItemProvider(object: URL(fileURLWithPath: track.path) as NSURL) }
+                        .contextMenu {
+                            Button("Show in Finder") { model.reveal(track.path) }
+                            Button("Play in LiStD") { player.play(path: track.path, title: track.title, artist: track.artist) }
+                            Button("Edit genre & vibe…") { model.editing = EditTrack(id: track.id, title: track.title, genre: track.genre, vibe: track.vibe) }
+                                .disabled(model.working || model.jobs.contains { $0.status == "running" })
+                        }
                 }
             }.font(.system(size: 11)).tableStyle(.inset(alternatesRowBackgrounds: false))
-        }.padding(.horizontal, 12).frame(maxHeight: .infinity)
+            if filtered.isEmpty { Text("No tracks in this view").font(.caption).foregroundStyle(.secondary) }
+        }.padding(12).frame(maxHeight: .infinity)
+        }
     }
 
     func loadDeck(_ deck: CratePlayer, track: LibraryTrack) {
@@ -505,7 +589,7 @@ struct CrateView: View {
     var skinPicker: some View {
         Picker("Skin", selection: $skin) {
             ForEach(CrateSkin.allCases) { option in Text(option.title).tag(option) }
-        }.pickerStyle(.menu).fixedSize().accessibilityLabel("Skin").help("Change LiSTd’s skin")
+        }.pickerStyle(.menu).fixedSize().accessibilityLabel("Skin").help("Change LiStD’s skin")
     }
 
     func updateDockIcon() {
@@ -518,16 +602,12 @@ struct CrateView: View {
         VStack(spacing: 0) {
             Group {
                 if model.selection == "import" { importView }
-                else if model.selection == "library" { libraryView }
+                else if model.selection == "library" { importView }
                 else if model.selection == "folders" { foldersView(job: model.jobs.first(where: { $0.id == folderJobID }) ?? model.jobs.first) }
                 else if let job = selectedJob { jobView(job) }
                 else { importView }
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
             Divider()
-            if skin != .boombox {
-                PlaybackStrip(player: player).background(.regularMaterial)
-                Divider()
-            }
             footer
         }.sheet(item: $model.reviewing) { review in
             TrackReviewPanel(model: model, player: player, review: review)
@@ -535,167 +615,20 @@ struct CrateView: View {
     }
 
     var boombox: some View {
-        GeometryReader { geometry in
-            let drawerHeight = min(420, max(260, geometry.size.height * 0.42))
-            let playerHeight = max(200, geometry.size.height - 125 - (showWorkspace ? drawerHeight : 0))
-        VStack(spacing: 0) {
-            BoomboxPlayer(player: player, showTracks: { showWorkspace.toggle() })
-                .frame(width: geometry.size.width * playerSize, height: playerHeight * playerSize)
-                .frame(width: geometry.size.width, height: playerHeight).padding(.top, 4)
-                .shadow(color: .black.opacity(0.3), radius: 5, y: 6)
-            PlaybackStrip(player: player, compact: true)
-                .frame(maxWidth: 920)
-            HStack(spacing: 12) {
-                Text("PLAYER SIZE").font(.system(size: 10, weight: .bold, design: .monospaced))
-                Slider(value: $playerSize, in: 0.45...1).frame(width: 160).accessibilityLabel("Player size")
-                Text("\(Int(playerSize * 100))%") .monospacedDigit().frame(width: 38)
+        VStack(spacing: 8) {
+            GeometryReader { geometry in
+                BoomboxPlayer(player: player, showTracks: { showWorkspace.toggle() })
+                    .frame(width: geometry.size.width * playerSize, height: geometry.size.height * playerSize)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+            }.frame(minHeight: 211).clipped()
+            PlaybackStrip(player: player)
+            HStack {
+                Text("Player size").font(.caption)
+                StableSlider(value: $playerSize, in: 0.45...1).frame(minWidth: 60, maxWidth: 160).accessibilityLabel("Player size")
+                Text("\(Int(playerSize * 100))%").monospacedDigit().frame(width: 38)
                 Button("Fill window") { playerSize = 1 }
-                Spacer()
-                Button { showWorkspace.toggle() } label: {
-                    Label(showWorkspace ? "Hide tracks & imports" : "Tracks & imports", systemImage: showWorkspace ? "chevron.down" : "chevron.up")
-                }.accessibilityLabel("Toggle tracks and imports")
-            }.font(.system(size: 11)).padding(.horizontal, 28).padding(.bottom, 12)
-            if showWorkspace {
-            VStack(spacing: 0) {
-                HStack(spacing: 8) {
-                    ForEach([("library", "Library", "music.note.list"), ("folders", "New arrivals", "folder.badge.plus"), ("import", "Import tracklist", "square.and.arrow.down")], id: \.0) { item in
-                        Button { model.selection = item.0 } label: {
-                            Label(item.1, systemImage: item.2).font(.system(size: 12, weight: .bold))
-                                .padding(.horizontal, 18).padding(.vertical, 9)
-                                .foregroundStyle(model.selection == item.0 ? Color.white : CrateSkin.ink)
-                                .background(model.selection == item.0 ? AnyShapeStyle(LinearGradient(colors: [skin.accent, Color(red: 0.34, green: 0, blue: 0.02)], startPoint: .top, endPoint: .bottom)) : AnyShapeStyle(CrateSkin.metal), in: Capsule())
-                                .overlay(Capsule().strokeBorder(.white.opacity(0.8)))
-                                .shadow(color: .black.opacity(0.3), radius: 1, y: 1)
-                        }.buttonStyle(SkinSurfacePress())
-                    }
-                    Spacer()
-                    Menu {
-                        ForEach(model.jobs) { job in
-                            Button("\(job.name) · \(job.ready)/\(job.tracks.count)") { model.selection = job.id }
-                        }
-                    } label: { Label(selectedJob?.name ?? "Imports", systemImage: "list.bullet.rectangle") }
-                        .frame(maxWidth: 320).disabled(model.jobs.isEmpty)
-                }.padding(12).background(CrateSkin.metal)
-                Divider()
-                workspace.background(Color(red: 0.94, green: 0.96, blue: 0.99))
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color(red: 0.01, green: 0.24, blue: 0.65), lineWidth: 3))
-            .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(.white.opacity(0.8)).padding(3))
-            .frame(height: drawerHeight)
-            .padding(.horizontal, 18).padding(.bottom, 14)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .animation(reduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.88), value: showWorkspace)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: playerSize)
-        .background(LinearGradient(colors: [Color(red: 0.90, green: 0.94, blue: 0.97), .white, Color(red: 0.59, green: 0.68, blue: 0.78)], startPoint: .top, endPoint: .bottom))
-        }
-    }
-
-    var silverwave: some View {
-        HStack(spacing: 12) {
-            VStack(spacing: 0) {
-                HStack(spacing: 10) {
-                    CrateEmblem().frame(width: 38, height: 38)
-                    Text("LiSTd").font(.custom("Trebuchet MS Bold Italic", size: 31)).tracking(-2)
-                }.foregroundStyle(CrateSkin.ink).padding(.vertical, 24)
-                VStack(spacing: 8) {
-                    skinNavigation("Import tracklist", symbol: "square.and.arrow.down", selection: "import")
-                    skinNavigation("New arrivals", symbol: "folder.badge.plus", selection: "folders")
-                    skinNavigation("Library", symbol: "music.note.list", selection: "library")
-                }.padding(.horizontal, 12)
-                HStack {
-                    Text("IMPORTS").font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(2)
-                    Spacer()
-                    Text("\(model.jobs.count)").font(.system(size: 10, design: .monospaced))
-                }.foregroundStyle(CrateSkin.ink.opacity(0.7)).padding(.horizontal, 18).padding(.top, 28).padding(.bottom, 10)
-                ScrollView {
-                    VStack(spacing: 5) {
-                        ForEach(model.jobs) { job in
-                            Button { model.selection = job.id } label: {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(job.name).font(.system(size: 12, weight: .semibold)).lineLimit(3).multilineTextAlignment(.leading)
-                                    Text("\(job.ready) / \(job.tracks.count) ready").font(.system(size: 10, design: .monospaced)).opacity(0.75)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading).padding(12)
-                                .foregroundStyle(model.selection == job.id ? .white : CrateSkin.ink)
-                                .background(model.selection == job.id ? skin.accent : Color.white.opacity(0.24), in: RoundedRectangle(cornerRadius: 8))
-                            }.buttonStyle(.plain)
-                        }
-                    }.padding(.horizontal, 12)
-                }
-                VStack(alignment: .leading, spacing: 7) {
-                    Text("SILVERWAVE").font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(2)
-                    Text("From tracklist to record bag.").font(.system(size: 10))
-                }.foregroundStyle(CrateSkin.ink.opacity(0.65)).padding(18)
-            }
-            .frame(width: 205).modifier(MetalPanel(radius: 18))
-            VStack(spacing: 12) {
-                SilverwaveDisplay(
-                    title: selectedJob?.name ?? (model.selection == "library" ? "Your record collection" : model.selection == "folders" ? "Freshly filed" : "Build your next crate"),
-                    subtitle: selectedJob.map { $0.status == "running" ? $0.message : "\($0.ready) filed · \($0.attention) need attention · \($0.minimum) kbps / lossless" } ?? "Tracklists in. Records filed. Ready for the next set.",
-                    count: "\(model.library.count) TRACKS")
-                workspace
-                    .background(Color(red: 0.94, green: 0.94, blue: 0.97))
-                    .clipShape(RoundedRectangle(cornerRadius: 11))
-                    .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(Color.black.opacity(0.3)))
-            }.padding(12).modifier(MetalPanel(radius: 20))
-        }
-        .padding(14)
-        .background(LinearGradient(colors: [Color(red: 0.38, green: 0.40, blue: 0.51), Color(red: 0.23, green: 0.24, blue: 0.33)], startPoint: .top, endPoint: .bottom))
-    }
-
-    func skinNavigation(_ title: String, symbol: String, selection: String) -> some View {
-        Button { model.selection = selection } label: {
-            HStack(spacing: 10) {
-                Image(systemName: symbol).frame(width: 20)
-                Text(title).font(.system(size: 12, weight: .semibold))
-                Spacer(minLength: 0)
-                if model.selection == selection { Circle().fill(Color(red: 0.75, green: 0.94, blue: 0.89)).frame(width: 5, height: 5) }
-            }.padding(.horizontal, 12).frame(height: 44)
-                .foregroundStyle(model.selection == selection ? .white : CrateSkin.ink)
-                .background {
-                    if model.selection == selection {
-                        RoundedRectangle(cornerRadius: 9).fill(LinearGradient(colors: [skin.accent, Color(red: 0.20, green: 0.14, blue: 0.34)], startPoint: .top, endPoint: .bottom))
-                    } else {
-                        RoundedRectangle(cornerRadius: 9).fill(CrateSkin.metal)
-                    }
-                }
-                .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(.white.opacity(0.6)))
-                .shadow(color: .black.opacity(0.18), radius: 1, y: 1)
-        }.buttonStyle(.plain).accessibilityAddTraits(model.selection == selection ? .isSelected : [])
-    }
-
-    var sidebar: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                Image(systemName: "square.stack.3d.up.fill").font(.system(size: 23)).foregroundStyle(skin.accent)
-                Text("LiSTd").font(.system(size: 25, weight: .semibold, design: .rounded))
-            }.padding(.horizontal, 22).padding(.top, 22).padding(.bottom, 24)
-            List(selection: $model.selection) {
-                Section("Workspace") {
-                    Label("Import tracklist", systemImage: "square.and.arrow.down").tag("import")
-                    Label("New arrivals", systemImage: "folder.badge.plus").tag("folders")
-                    Label("Library", systemImage: "music.note.list").tag("library")
-                }
-                Section("Imports") {
-                    ForEach(model.jobs) { job in
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(job.name).font(.system(size: 12, weight: .medium)).lineLimit(2)
-                            HStack(spacing: 5) {
-                                if job.status == "running" { Circle().fill(skin.accent).frame(width: 5, height: 5) }
-                                Text("\(job.ready)/\(job.tracks.count) ready").font(.system(size: 11)).foregroundStyle(.secondary)
-                            }
-                        }.padding(.vertical, 4).tag(job.id)
-                    }
-                }
-            }.listStyle(.sidebar)
-            Spacer(minLength: 0)
-            Text("From tracklist to record bag.")
-                .font(.system(size: 11)).foregroundStyle(.secondary)
-                .padding(22)
-        }
+            }.padding(.horizontal).padding(.bottom, 8)
+        }.background(LinearGradient(colors: [Color(red: 0.90, green: 0.94, blue: 0.97), .white, Color(red: 0.59, green: 0.68, blue: 0.78)], startPoint: .top, endPoint: .bottom))
     }
 
     var importView: some View {
@@ -732,7 +665,7 @@ struct CrateView: View {
                         .accessibilityLabel("Tracklist text")
                     Text("Example: 0:00:00 Easy - Freedom Satellite").font(.system(size: 11)).foregroundStyle(.secondary)
                 }
-                HStack(spacing: 20) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 12)], spacing: 12) {
                     TextField("Import name", text: $name).textFieldStyle(.roundedBorder).frame(maxWidth: 210)
                     Picker("Text order", selection: $order) {
                         Text("Title - Artist").tag("title-artist")
@@ -745,7 +678,7 @@ struct CrateView: View {
                         Text("150 kbps / lossless").tag(150)
                     }.frame(maxWidth: 230)
                 }.font(.system(size: 12))
-                HStack {
+                VStack(alignment: .leading, spacing: 12) {
                     Toggle("Download and organize automatically", isOn: $automatic).toggleStyle(.checkbox)
                     Spacer()
                     Button(automatic ? "Download & organize" : "Import for review") {
@@ -754,7 +687,7 @@ struct CrateView: View {
                 }
                 Text("CSV artist, title and duration fields are preserved. Set timestamps are cue points, not track lengths.")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
-            }.padding(34).frame(maxWidth: 1050, alignment: .leading)
+            }.padding(20).frame(maxWidth: 1050, alignment: .leading)
         }
     }
 
@@ -783,96 +716,82 @@ struct CrateView: View {
     }
 
     func jobView(_ job: ImportJob) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text(job.name).font(.system(size: 25, weight: .semibold, design: .rounded)).lineLimit(2)
-                        if let url = URL(string: job.source), !job.source.isEmpty {
-                            Link("View source set", destination: url).font(.system(size: 12))
-                        }
-                    }
-                    Spacer()
-                    if job.status == "running" {
-                        Button("Stop") { model.stop(job.id) }.controlSize(.large)
-                    } else {
-                        VStack(alignment: .trailing, spacing: 8) {
-                        Button(job.ready == job.tracks.count ? "Check again" : (job.status == "queued" ? "Download & organize" : "Retry unfinished")) { model.start(job.id) }
-                            .buttonStyle(.borderedProminent).controlSize(.large)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(job.name).font(.headline).lineLimit(1).help(job.name)
+                    Text("\(job.ready) / \(job.tracks.count) ready · \(job.minimum) kbps or lossless")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if job.status == "running" {
+                    Button("Stop") { model.stop(job.id) }
+                } else {
+                    Menu("Import actions") {
+                        Button(job.status == "queued" ? "Download & organize" : "Retry unfinished") { model.start(job.id) }
+                        Button("Deep search all missing") { model.start(job.id, deep: true) }
+                            .disabled(!job.tracks.contains { ["unavailable", "stopped", "review"].contains($0.status) && $0.path.isEmpty })
                         if job.ready == 0 {
                             Button("Swap artist / title & recheck") { model.correctImport(["swap-order", job.id]) }
-                                .help("Correct a reversed tracklist and verify downloaded files locally. Does not download.")
                         }
-                        }.disabled(model.working || model.jobs.contains { $0.status == "running" })
+                        Button("Show new folders") { folderJobID = job.id; model.selection = "folders" }
+                        if let url = URL(string: job.source), !job.source.isEmpty { Link("View source set", destination: url) }
+                    }.disabled(model.working || model.jobs.contains { $0.status == "running" })
+                }
+            }.padding(.horizontal, 12).padding(.top, 8)
+            if job.status == "running" {
+                ProgressView(value: Double(job.ready + job.attention), total: Double(max(1, job.tracks.count))).padding(.horizontal, 12)
+                Text(job.message).font(.caption).lineLimit(2).padding(.horizontal, 12)
+            }
+            List(job.tracks) { track in
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack {
+                        Text(track.cue.isEmpty ? String(format: "%02d", track.index + 1) : track.cue)
+                            .font(.caption.monospaced()).foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(track.title).fontWeight(.medium).lineLimit(2)
+                            Text(track.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        Spacer(minLength: 4)
+                        StatusPill(status: track.status)
                     }
-                }
-                HStack(spacing: 20) {
-                    Label("\(job.ready) of \(job.tracks.count) ready", systemImage: "checkmark.circle").foregroundStyle(.green)
-                    if job.attention > 0 { Label("\(job.attention) need attention", systemImage: "exclamationmark.circle").foregroundStyle(.orange) }
-                    Spacer()
-                    Text("\(job.minimum) kbps or lossless").foregroundStyle(.secondary)
-                }.font(.system(size: 12, weight: .medium))
-                if job.status == "running" {
-                    ProgressView(value: Double(job.ready + job.attention), total: Double(job.tracks.count)).tint(skin.accent)
-                    Text(job.message).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
-                }
-            }.padding(28)
-            Divider()
-            Table(job.tracks) {
-                TableColumn("Cue") { track in Text(track.cue.isEmpty ? String(format: "%02d", track.index+1) : track.cue).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary) }.width(65)
-                TableColumn("Track") { track in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(track.title).font(.system(size: 13, weight: .medium)).lineLimit(1)
-                        Text(track.artist).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
-                    }.padding(.vertical, 8)
-                }.width(min: 170, ideal: 235)
-                TableColumn("Status") { track in
-                    if track.status == "review", !track.path.isEmpty {
-                        Button { model.reviewing = ReviewTrack(jobID: job.id, track: track) } label: {
-                            StatusPill(status: track.status)
-                        }.buttonStyle(.plain).help("Listen, compare file tags and correct the expected track")
-                    } else { StatusPill(status: track.status).help(track.note) }
-                }.width(105)
-                TableColumn("Quality") { track in Text(track.quality ?? "—").font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary) }.width(95)
-                TableColumn("Landed in") { track in
-                    if track.status == "ready" {
-                        Button { model.reveal(track.path) } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "folder").foregroundStyle(skin.accent)
-                                Text("\(track.genre) / \(track.vibe)").font(.system(size: 11)).lineLimit(2)
+                    Text(track.note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 8)], alignment: .leading, spacing: 8) {
+                        if ["ready", "existing"].contains(track.status), !track.path.isEmpty {
+                            Button("Load A") { player.play(path: track.path, title: track.title, artist: track.artist, autoplay: false, bpm: track.bpm) }
+                            Button("Load B") { deckB.play(path: track.path, title: track.title, artist: track.artist, autoplay: false, bpm: track.bpm) }
+                            Button("Show in Finder") { model.reveal(track.path) }
+                            Text(track.quality ?? "").font(.caption)
+                            if let id = track.track_id {
+                                Button("Genre & vibe…") { model.editing = EditTrack(id: id, title: track.title, genre: track.genre, vibe: track.vibe) }
+                                    .disabled(model.working || model.jobs.contains { $0.status == "running" })
                             }
-                        }.buttonStyle(.plain).help(track.path)
-                    } else {
-                        Text(track.note).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(2).help(track.note)
-                    }
-                }.width(min: 185, ideal: 260)
-                TableColumn("") { track in
-                    Button { player.play(path: track.path, title: track.title, artist: track.artist) } label: {
-                        Image(systemName: player.path == track.path && player.isPlaying ? "speaker.wave.2.fill" : "play.fill")
-                    }.buttonStyle(.borderless).disabled(!["ready", "existing"].contains(track.status) || track.path.isEmpty).accessibilityLabel("Play \(track.title) in LiSTd").help("Play in LiSTd")
-                }.width(26)
-                TableColumn("") { track in
-                    Menu {
+                        }
                         if track.status == "review", !track.path.isEmpty {
                             Button("Review file…") { model.reviewing = ReviewTrack(jobID: job.id, track: track) }
                         }
-                        Button("Play in LiSTd") { player.play(path: track.path, title: track.title, artist: track.artist) }.disabled(!["ready", "existing"].contains(track.status) || track.path.isEmpty)
-                        Button("Show in Finder") { model.reveal(track.path) }.disabled(track.path.isEmpty)
-                        if let id = track.track_id {
-                            Button("Edit genre & vibe…") { model.editing = EditTrack(id: id, title: track.title, genre: track.genre, vibe: track.vibe) }.disabled(model.jobs.contains { $0.status == "running" })
+                        if ["unavailable", "stopped", "review"].contains(track.status), track.path.isEmpty {
+                            Button("Deep search") { model.start(job.id, deep: true, index: track.index) }
+                                .disabled(model.working || model.jobs.contains { $0.status == "running" })
                         }
-                    } label: { Image(systemName: "ellipsis") }.menuStyle(.borderlessButton).frame(width: 22)
-                }.width(26)
-            }.tableStyle(.inset(alternatesRowBackgrounds: true))
-            if job.tracks.contains(where: { $0.status == "ready" }) {
-                Divider()
-                HStack(spacing: 10) {
-                    Image(systemName: "folder.badge.plus").foregroundStyle(skin.accent)
-                    Text("New music, already filed.").font(.system(size: 12, weight: .medium))
-                    Spacer()
-                    Button("Show new folders") { folderJobID = job.id; model.selection = "folders" }
-                }.padding(.horizontal, 28).padding(.vertical, 16)
-            }
+                    }.buttonStyle(.bordered).controlSize(.small)
+                    if let candidates = track.candidates, !candidates.isEmpty {
+                        DisclosureGroup("\(candidates.count) candidates need review") {
+                            ForEach(candidates) { candidate in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(candidate.filename).font(.caption).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                                    Text("\(candidate.username) · \(candidate.reason)").font(.caption).foregroundStyle(.secondary)
+                                    Button("Download & verify this candidate") {
+                                        model.start(job.id, deep: true, index: track.index, candidate: candidate.number)
+                                    }.disabled(model.working || model.jobs.contains { $0.status == "running" } || !track.path.isEmpty || ["ready", "existing"].contains(track.status))
+                                }.padding(.vertical, 5)
+                            }
+                            Text("Selection still requires the original identity, duration, measured quality and complete decode. Uncertain files remain staged for review.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }.padding(.vertical, 6)
+            }.listStyle(.inset)
         }
     }
 
@@ -906,49 +825,12 @@ struct CrateView: View {
         }
     }
 
-    var libraryView: some View {
-        let filtered = model.library.filter { search.isEmpty || "\($0.title) \($0.artist) \($0.genre) \($0.vibe)".localizedCaseInsensitiveContains(search) }
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Library").font(.system(size: 28, weight: .semibold, design: .rounded))
-                    Text("\(model.library.count) tracks · genre tags and estimated vibes").font(.system(size: 12)).foregroundStyle(.secondary)
-                }
-                Spacer()
-                TextField("Find an artist, genre or vibe", text: $search).textFieldStyle(.roundedBorder).frame(width: 270)
-            }.padding(28)
-            Table(filtered) {
-                TableColumn("Track") { track in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(track.title).fontWeight(.medium)
-                        Text(track.artist).font(.caption).foregroundStyle(.secondary)
-                    }.padding(.vertical, 6)
-                }.width(min: 230, ideal: 330)
-                TableColumn("Genre", value: \.genre).width(min: 110, ideal: 160)
-                TableColumn("Vibe", value: \.vibe).width(min: 120, ideal: 170)
-                TableColumn("BPM") { track in Text(track.bpm.map { String(format: "%.1f", $0) } ?? "—").monospacedDigit() }.width(65)
-                TableColumn("") { track in
-                    Button { player.play(path: track.path, title: track.title, artist: track.artist) } label: {
-                        Image(systemName: player.path == track.path && player.isPlaying ? "speaker.wave.2.fill" : "play.fill")
-                    }.buttonStyle(.borderless).accessibilityLabel("Play \(track.title) in LiSTd").help("Play in LiSTd")
-                }.width(28)
-                TableColumn("") { track in
-                    Menu {
-                        Button("Show in Finder") { model.reveal(track.path) }
-                        Button("Play in LiSTd") { player.play(path: track.path, title: track.title, artist: track.artist) }
-                        Button("Edit genre & vibe…") { model.editing = EditTrack(id: track.id, title: track.title, genre: track.genre, vibe: track.vibe) }.disabled(model.jobs.contains { $0.status == "running" })
-                    } label: { Image(systemName: "ellipsis") }.menuStyle(.borderlessButton)
-                }.width(30)
-            }.font(.system(size: 12))
-        }
-    }
-
     var footer: some View {
         HStack(spacing: 7) {
             Circle().fill(model.ready && model.configured ? Color.green : Color.orange).frame(width: 6, height: 6)
             Text(!model.ready ? "Download tools unavailable" : model.configured ? "Soulseek account saved" : "Sign in to Soulseek")
             Spacer()
-            Text("Moves files · no copies · genre tags + estimated vibes")
+            Text("Genre tags · estimated vibes").lineLimit(1)
             Button { model.openFolder(model.root.appendingPathComponent("downloads").path) } label: { Image(systemName: "folder") }.buttonStyle(.plain).help("Open downloads")
         }.font(.system(size: 10)).foregroundStyle(.secondary).padding(.horizontal, 18).padding(.vertical, 11)
     }
@@ -971,6 +853,10 @@ struct SoulseekAccountPanel: View {
             Text("Sign-in checks your connection without downloading music. Close other Soulseek clients using this account.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if let error = model.accountError { Text(error).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
+            if model.accountNeedsUnlock {
+                Button("Unlock saved account") { model.unlockAccount() }
+                    .help("Ask macOS to authorize this rebuilt app to read the existing Soulseek account. Does not change or remove the account.")
+            }
             HStack {
                 if model.configured { Button("Sign out", role: .destructive) { model.signOut(); password = "" } }
                 Spacer()
@@ -1093,7 +979,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 @main struct CrateApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     var body: some Scene {
-        WindowGroup("LiSTd") { CrateView() }
+        WindowGroup("LiStD") { CrateView() }
             .defaultSize(width: 1280, height: 920)
             .windowStyle(.titleBar)
     }

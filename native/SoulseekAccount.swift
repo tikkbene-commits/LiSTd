@@ -21,8 +21,15 @@ enum SoulseekKeychain {
         }
     }
 
-    static func load() throws -> SoulseekAccount? {
+    static func load(allowInteraction: Bool = true) throws -> SoulseekAccount? {
         var request = query
+        // Legacy login-keychain ACLs ignore LAContext's no-UI flag; preserve this existing store.
+        var previous: DarwinBoolean = true
+        if !allowInteraction {
+            try check(SecKeychainGetUserInteractionAllowed(&previous))
+            try check(SecKeychainSetUserInteractionAllowed(false))
+        }
+        defer { if !allowInteraction { SecKeychainSetUserInteractionAllowed(previous.boolValue) } }
         request[kSecReturnData as String] = true
         request[kSecMatchLimit as String] = kSecMatchLimitOne
         var item: CFTypeRef?

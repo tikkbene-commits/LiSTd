@@ -1,14 +1,17 @@
-# Install LiSTd on your Mac
+# Install LiStD on your Mac
+
+The existing public 1.4.1 archive still uses the spelling LiSTd. New source builds
+use LiStD. The download links below continue to target that existing public release.
 
 **One download for Intel and Apple Silicon · macOS 14 or newer**
 
-[**Download LiSTd-Mac.zip →**](https://github.com/tikkbene-commits/LiSTd/releases/latest/download/LiSTd-Mac.zip)
+[**Download LiStD-Mac.zip →**](https://github.com/tikkbene-commits/LiSTd/releases/latest/download/LiSTd-Mac.zip)
 
 You do not need Terminal, Python, Homebrew, Rosetta or a separate Sockseek app.
 A Soulseek account and an internet connection are needed only for searches and
 downloads. You can skip sign-in and play local music first.
 
-**Sockseek is already included in LiSTd-Mac.zip.** For a source build or separate CLI
+**Sockseek is already included in LiStD-Mac.zip.** For a source build or separate CLI
 installation, see the [Sockseek setup in the README](README.md#requirements) and
 the [official Sockseek project](https://github.com/fiso64/sockseek).
 
@@ -19,15 +22,15 @@ physical Intel Mac and a macOS 14 installation is still pending; the
 ## 1. Download the app
 
 Open [Releases](https://github.com/tikkbene-commits/LiSTd/releases/latest) and download
-**LiSTd-Mac.zip** under **Assets**. GitHub’s **Source code** archives and **Code → Download ZIP**
+**LiStD-Mac.zip** under **Assets**. GitHub’s **Source code** archives and **Code → Download ZIP**
 contain the developer project, not the ready-to-use Mac app.
 
 ## 2. Put it in Applications
 
-1. Find **LiSTd-Mac.zip** in Downloads and double-click it to unzip.
-2. Open the extracted **LiSTd** folder.
-3. Drag **LiSTd.app** into your Mac’s **Applications** folder.
-4. Open **Applications → LiSTd**.
+1. Find **LiStD-Mac.zip** in Downloads and double-click it to unzip.
+2. Open the extracted **LiStD** folder.
+3. Drag **LiStD.app** into your Mac’s **Applications** folder.
+4. Open **Applications → LiStD**.
 
 Keep the app bundle complete. You do not need to move any individual files from
 inside it or install its bundled tools separately.
@@ -37,9 +40,9 @@ inside it or install its bundled tools separately.
 The current release is ad-hoc signed and **not notarized by Apple**. A downloaded
 copy can be blocked because Apple cannot verify its developer.
 
-1. Try opening **LiSTd** once, then dismiss the blocked-open message.
+1. Try opening **LiStD** once, then dismiss the blocked-open message.
 2. Open **System Settings → Privacy & Security**.
-3. In the Security section, find the message about LiSTd and click **Open Anyway**.
+3. In the Security section, find the message about LiStD and click **Open Anyway**.
 4. Confirm **Open** and authenticate with your Mac account if asked.
 
 Do this only for the app you downloaded from this repository’s release. Keep
@@ -71,7 +74,7 @@ for review files, retrying, genre/vibe corrections and the four skins.
 
 ## Your files and updates
 
-- **App:** `/Applications/LiSTd.app` after installation.
+- **App:** `/Applications/LiStD.app` after installation.
 - **Downloads and saved imports:** `~/Music/LiSTd/` — in Finder, use **Go → Go to Folder**
   and paste that path.
 - **Accepted tracks:** `~/Music/LiSTd/downloads/organized/`.
@@ -81,7 +84,7 @@ for review files, retrying, genre/vibe corrections and the four skins.
 - **Analysis cache:** `~/Library/Caches/LiSTd/numba/`. The first beat analysis after
   an update may take longer while this cache builds.
 
-To update, finish or stop any import, quit LiSTd, download the new Mac ZIP and
+To update, finish or stop any import, quit LiStD, download the new Mac ZIP and
 replace the app in Applications. Your music, history and labels remain in the data
 folder. Keep a backup of that folder, especially its `.music-sorter/catalog.json` file.
 An ad-hoc signed update can prompt for Keychain access again.
@@ -90,7 +93,7 @@ An ad-hoc signed update can prompt for Keychain access again.
 
 | What you see | What to try |
 | --- | --- |
-| You downloaded a folder of source files | Download **LiSTd-Mac.zip** from **Releases → Assets** instead. |
+| You downloaded a folder of source files | Download **LiStD-Mac.zip** from **Releases → Assets** instead. |
 | macOS cannot verify the developer | Follow the first-open steps above. A managed Mac may block approval. |
 | The app is reported as damaged or incomplete | Download the ZIP again and extract the whole app. Report the exact message if it persists; do not change security settings to force it open. |
 | Sign-in fails | Check your account and connection, close another client using the same account, and retry. |
@@ -104,4 +107,4 @@ Still stuck? [Open an issue](https://github.com/tikkbene-commits/LiSTd/issues) w
 macOS version, Mac chip, app version, steps and exact error. Remove account details
 and personal paths before sharing logs or screenshots.
 
-[Back to LiSTd →](README.md)
+[Back to LiStD →](README.md)

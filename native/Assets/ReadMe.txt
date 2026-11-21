@@ -1,17 +1,17 @@
-LiSTd for Mac
+LiStD for Mac
 
 For Intel and Apple Silicon Macs running macOS 14 or newer.
 No Python, Homebrew, Sockseek or Rosetta installation is needed.
 
-1. Drag LiSTd.app into Applications, then open it.
+1. Drag LiStD.app into Applications, then open it.
 2. Sign in with your own Soulseek username and password. Close other Soulseek
-   clients using that account. LiSTd saves the password in this Mac's Keychain.
+   clients using that account. LiStD saves the password in this Mac's Keychain.
 3. Import or drop a CSV/text tracklist. Check artist/title order and quality.
    With automatic downloads enabled, importing starts downloading and organizing.
 
 FIRST OPEN
 This build is not Apple-notarized. After trying to open it, go to System Settings
-> Privacy & Security > Open Anyway for LiSTd, then confirm Open. A managed work
+> Privacy & Security > Open Anyway for LiStD, then confirm Open. A managed work
 Mac may prohibit this. Do not disable Gatekeeper or other macOS protections.
 
 YOUR FILES

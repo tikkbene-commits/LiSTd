@@ -278,6 +278,38 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(result['tracks'][0]['status'], 'ready')
         self.assertTrue(Path(result['tracks'][0]['path']).is_file())
 
+    def test_deep_verification_keeps_quality_and_duration_and_reviews_typos(self):
+        path = self.audio(name='Fixture - Pulse - Release.flac', title='Fixture - Pulse - Release')
+        row = self.job['tracks'][0]
+        row.update(deep_search=True, original=dict(row['original'], Album='Release'), length=8)
+        self.assertTrue(crate.verify(path, row, 320)['lossless'])
+        row['length'] = 30
+        with self.assertRaisesRegex(ValueError, 'Duration differs'):
+            crate.verify(path, row, 320)
+        row['length'] = 8
+        typo = self.audio(name='Fixture - Pulze.flac', title='Pulze')
+        with self.assertRaisesRegex(ValueError, 'identity needs review'):
+            crate.verify(typo, row, 320)
+        low = self.audio(name='Fixture - Pulse.mp3', bitrate=128)
+        with self.assertRaisesRegex(ValueError, 'below 320'):
+            crate.verify(low, row, 320)
+
+    def test_collection_metadata_is_read_only_and_reconciles_import_paths(self):
+        path = self.audio()
+        crate.complete_hook(self.root, self.job['id'], 0, path)
+        folder = crate.job_dir(self.root, self.job['id'])
+        self.job['tracks'][0].update(json.loads((folder/'hook-0.json').read_text()))
+        crate.save_job(self.root, self.job)
+        paths = [self.root/'.music-sorter/catalog.json', folder/'job.json']
+        before = [p.read_bytes() for p in paths]
+        state = crate.snapshot(self.root)
+        track = state['library'][0]
+        self.assertTrue(track['download_folder'].startswith('organized/'))
+        self.assertEqual(len(track['imports']), 1)
+        self.assertIn('Test import', track['imports'][0])
+        self.assertGreater(track['added_at'], 0)
+        self.assertEqual([p.read_bytes() for p in paths], before)
+
     def test_graphical_label_action_updates_path_and_job(self):
         path = self.audio()
         destination = crate.complete_hook(self.root, self.job['id'], 0, path)

@@ -1,6 +1,9 @@
 <div align="center">
 
-# LiSTd
+# LiStD
+
+The current source is LiStD 1.5. The existing public download remains the previously
+published 1.4.1 build, named LiSTd; this source update does not replace that release.
 
 ### From tracklist to record collection.
 
@@ -10,7 +13,7 @@ A native Mac app for collecting, organizing and auditioning music for your next 
 
 [**Download for Mac**](https://github.com/tikkbene-commits/LiSTd/releases/latest/download/LiSTd-Mac.zip) · [Installation guide](INSTALL.md) · [User guide](CRATE.md) · [Report a bug](https://github.com/tikkbene-commits/LiSTd/issues)
 
-<img src="docs/images/amped.png" alt="LiSTd’s Amped skin: a blue boombox with red lettering, playback controls and a pitch fader" width="760">
+<img src="docs/images/amped.png" alt="LiStD’s Amped skin: a blue boombox with red lettering, playback controls and a pitch fader" width="760">
 
 <sub>Amped · Blue / Red — one of four built-in skins. Interface previews use generated example audio.</sub>
 
@@ -21,7 +24,7 @@ A native Mac app for collecting, organizing and auditioning music for your next 
 ## What it does
 
 Drop in a DJ-set tracklist, check its artist/title order and choose your quality.
-LiSTd searches through Soulseek, verifies downloaded files and organizes accepted
+LiStD searches through Soulseek, verifies downloaded files and organizes accepted
 tracks into folders you can browse and play inside the app.
 
 | Collect | Organize | Listen |
@@ -39,7 +42,7 @@ internet connection are needed for searches and downloads; local playback works
 without signing in. No music or accounts are included.
 
 [Sockseek](https://github.com/fiso64/sockseek) is the Soulseek command-line downloader
-used by LiSTd. The Mac ZIP **includes Sockseek 3.0.6**. Install it separately only
+used by LiStD. The Mac ZIP **includes Sockseek 3.0.6**. Install it separately only
 for a source build or standalone CLI use:
 
 <details>
@@ -49,7 +52,7 @@ for a source build or standalone CLI use:
    [Apple Silicon](https://github.com/fiso64/sockseek/releases/download/v3.0.6/sockseek_3.0.6_osx-arm64.tar.gz)
    or [Intel](https://github.com/fiso64/sockseek/releases/download/v3.0.6/sockseek_3.0.6_osx-x64.tar.gz).
    The [official releases page](https://github.com/fiso64/sockseek/releases) lists other versions;
-   newer upstream versions have not been validated with LiSTd.
+   newer upstream versions have not been validated with LiStD.
 2. Extract the archive and, in Terminal, change into the extracted folder containing
    `sockseek` and `LICENSE`. For example, on Apple Silicon:
 
@@ -72,7 +75,7 @@ for a source build or standalone CLI use:
    ```
 
 If you already have another Sockseek installation, check the path printed above;
-LiSTd's development app searches `/opt/homebrew/bin` before `/usr/local/bin`.
+LiStD's development app searches `/opt/homebrew/bin` before `/usr/local/bin`.
 The GUI handles account sign-in through Keychain. Standalone CLI use has its own
 configuration described in the [official Sockseek Quick Start](https://github.com/fiso64/sockseek#quick-start).
 Installing the executable does not start a download or configure an account.
@@ -81,12 +84,12 @@ Installing the executable does not start a download or configure an account.
 
 ## Install in a few steps
 
-1. **[Download LiSTd-Mac.zip](https://github.com/tikkbene-commits/LiSTd/releases/latest/download/LiSTd-Mac.zip)**
+1. **[Download LiStD-Mac.zip](https://github.com/tikkbene-commits/LiSTd/releases/latest/download/LiSTd-Mac.zip)**
    from Releases. Choose the Mac ZIP, not GitHub’s **Source code** archives or **Code → Download ZIP**.
-2. Double-click the ZIP, open the **LiSTd** folder and drag **LiSTd.app** to **Applications**.
-3. Open LiSTd. This build is **not Apple-notarized**: if macOS blocks an unverified
+2. Double-click the ZIP, open the **LiStD** folder and drag **LiStD.app** to **Applications**.
+3. Open LiStD. This build is **not Apple-notarized**: if macOS blocks an unverified
    developer, try opening it once, then go to **System Settings → Privacy & Security → Open Anyway**
-   for LiSTd and confirm **Open**. Keep macOS security protections enabled.
+   for LiStD and confirm **Open**. Keep macOS security protections enabled.
 4. Sign in with your own Soulseek account, or choose **Later** to play local files first.
    Close other Soulseek clients using the same account before signing in or downloading.
 
@@ -119,13 +122,21 @@ is also included in the repository.
 
 **Importing with automatic downloads enabled starts downloads.** Turn that option
 off to inspect the queue first. Keep the default **320 kbps or lossless**, or choose
-your own threshold. LiSTd checks artist/title evidence, supplied duration, measured
+your own threshold. LiStD checks artist/title evidence, supplied duration, measured
 bitrate and full-file decoding before accepting a file. Uncertain files stay in
 staging for review; alternate mixes and lower quality are not silently substituted.
 
 Watch progress per track, then use **New arrivals** to open the folders that received
 music. Use **Review file** to listen to an uncertain match, correct the expected
 artist/title and recheck it. **Retry unfinished** searches again for remaining tracks.
+
+The collection defaults to **All tracks**, with folder, import/tracklist, genre and
+artist views plus title/artist/BPM/date sorting. Search applies within the selected
+view. Drag the dividers to resize collection, player and the nonmodal import drawer.
+**New import** opens the drawer; collapsing it keeps playback and progress.
+Missing tracks offer individual or batch **Deep search**, with bounded fallback
+queries and ambiguous candidates held for review. Original import fields and all
+quality/verification checks remain in effect.
 
 ## Four ways to listen
 
@@ -134,7 +145,7 @@ artist/title and recheck it. **Retry unfinished** searches again for remaining t
 | **Amped · Blue / Red** | A blue boombox, chrome controls, pitch fader and live LED spectrum |
 | **Signal · Dual Deck** | Two decks, stacked waveforms, beat cues, tempo/phase sync and three-band cut EQ |
 | **Silverwave** | Silver and purple, with a classic media-player feel |
-| **LiSTd · Original** | The straightforward native macOS workspace |
+| **LiStD · Original** | The straightforward native macOS workspace |
 
 Switch with the **Skin** menu. Your library and imports stay available across skins.
 Playback supports play/pause, stop, seeking, volume and **0.5×–1.5× speed**. Speed also
@@ -145,20 +156,21 @@ changes pitch; there is no key lock.
 In **Signal**, load files with the library’s **A/B** buttons, a deck’s **Open file**
 button, or a drop onto its waveform. Tracks load paused. Analyze beats, check them
 by ear, and correct **BPM**, **½ / ×2**, **Tap** or **Set beat** when needed.
-**Sync B → A** matches B’s effective tempo and beat phase to A; **Play both** schedules
+**Sync A to B** changes A to match B’s effective tempo and beat phase;
+**Sync B to A** changes B to match A. The second deck remains unchanged; **Play both** schedules
 both decks together. Each deck has its own bass, mid, high, level and mute controls.
 
 ## What the estimates mean
 
 - **Genre comes from file tags or your corrections.** Missing or ambiguous genres
-  remain **Unsorted**. LiSTd does not infer genre with a trained audio model.
+  remain **Unsorted**. LiStD does not infer genre with a trained audio model.
 - **Vibe is a tempo/density estimate:** Warm-Up, Groove, Driving, Peak Time or Needs Review.
   BPM can be wrong or half/double tempo. Labels are a starting point for listening.
 - **Beat sync uses a fixed tempo and one-time alignment.** It can drift on live drums.
   There is no continuous lock, downbeat/phrase detection, headphone cue routing,
   recording or export. Tempo and beat-cue corrections last for the session.
 - **Track matching uses metadata and filename evidence, not audio fingerprinting.**
-  A YouTube tracklist can be imported, but LiSTd does not identify songs from the mix
+  A YouTube tracklist can be imported, but LiStD does not identify songs from the mix
   audio or download the YouTube video.
 - **Availability depends on peers.** A search result may be offline or unavailable;
   a download cannot be guaranteed.
@@ -176,7 +188,7 @@ temporary configuration file while connecting. Signing out keeps your music and
 history. [More about storage, verification and credentials →](CRATE.md#files-and-credentials)
 
 The first beat analysis after an update can take longer while its local cache builds.
-Keep `.music-sorter/catalog.json` inside your LiSTd data folder: it holds manual
+Keep `.music-sorter/catalog.json` inside your LiStD data folder: it holds manual
 labels and move-recovery history. Back up the data folder before manually moving
 organized music. The [command-line organizer](MUSIC_SORTER.md) includes move previews
 and undo commands.
@@ -197,7 +209,7 @@ Keep the pinned numerical versions; the previous NumPy 2 runtime caused beat-ana
 git clone https://github.com/tikkbene-commits/LiSTd.git
 cd LiSTd
 ./build-crate
-open LiSTd.app
+open LiStD.app
 ```
 
 Keep this development app beside its source. It uses the checkout as its workspace.
@@ -235,13 +247,13 @@ from Git.
 ## Help and feedback
 
 [Open an issue](https://github.com/tikkbene-commits/LiSTd/issues) with your macOS version,
-Mac chip, LiSTd version, the steps you took and the error message. Remove passwords,
+Mac chip, LiStD version, the steps you took and the error message. Remove passwords,
 account configuration and personal file paths from any logs or screenshots you attach.
 Check the [installation troubleshooting](INSTALL.md#troubleshooting) first.
 
 ## License and credits
 
-LiSTd’s original code is available under the **[MIT license](LICENSE)**.
+LiStD’s original code is available under the **[MIT license](LICENSE)**.
 It is built with SwiftUI, AVFoundation, Accelerate, Python and librosa, with
 Soulseek transfers provided by Sockseek and audio inspection provided by FFmpeg.
 Bundled components retain their own licenses; see [THIRD_PARTY.md](THIRD_PARTY.md)
