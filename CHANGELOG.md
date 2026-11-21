@@ -5,6 +5,36 @@ decisions, validation performed and any checks skipped. Keep this history factua
 the initial entries below summarize retained source, local records and this session,
 rather than reconstruct every past chat message.
 
+## 2026-11-21 — Cyber · Lilac skin
+
+- Added **Cyber · Lilac** (`native/CyberSkin.swift`), a fifth skin recreating the
+  user-supplied lilac media-player image. Outlines were traced from the image's own
+  545 × 448 pixels (region spans per row) and colours sampled from it; the artwork
+  is vector, so it stays sharp at any Player size. The reference's brand text was
+  replaced with a LiStD wordmark at the user's request.
+- Every element works: live spectrum screen (eye toggles it), seek knob, volume
+  ball on the pink ring with +/− marks and speaker mute, speed arrows and reset mark,
+  scrolling title field, elapsed/remaining time field, Tracks & imports and open-file
+  buttons, minimize/close, and a seven-control transport ring. Previous/next step
+  through the collection pane's visible order (new `CollectionBrowser.neighbour`);
+  decisions on prev/next, screen content, branding and control mapping were
+  confirmed with the user before implementation.
+- Cyber uses the light appearance and Amped's taller player minimum (shared via
+  `CrateSkin.isArtwork`); the Player size row is now one shared view for both.
+- Validation: new `tests/check_cyber_player.swift` sends real mouse clicks/drags to
+  every Cyber control in an offscreen window (muted player, generated silence) and
+  passed; `check_crate_skin` gained Cyber landmark-colour, transparency and
+  volume-ring round-trip checks and passed; `check_collection` gained stepping checks
+  and passed. A side-by-side/overlay comparison with the reference was used to tune
+  the ring path and shading (ring within about 5 px; horn shading within a few
+  levels). Player, dual-deck, slider, spectrum and no-UI Keychain checks passed; the
+  Python suite passed (37 tests). Both architectures built with `./build-crate` in
+  the worktree, using generated test tones there, never the real collection.
+- Not verified: the rebuilt app window could not be screenshotted or clicked from
+  this session (no Screen Recording permission or desktop control), so the skin was
+  checked through offscreen renders and the hosted-control test, not in the visible
+  app window. No downloads were started.
+
 ## 2026-11-21 — Final rebuilt-binary verification
 
 - Confirmed the final rebuilt LiStD binary refreshes the real collection after

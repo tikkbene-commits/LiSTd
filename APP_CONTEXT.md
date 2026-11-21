@@ -47,7 +47,7 @@ Every skin has the same resizable collection pane on the left, and a player abov
 a collapsible **Tracks & imports** drawer on the right. Native `HSplitView` and
 `VSplitView` dividers resize actual content. The collection has a 310-point minimum;
 the player/drawer have a 440-point minimum width, with independently scrolling
-collection, Signal mixer and import content. The window minimum is 800 × 620 (800 × 720 for Amped, whose player minimum is
+collection, Signal mixer and import content. The window minimum is 800 × 620 (800 × 720 for Amped and Cyber, whose player minimum is
 400 points; 800 × 680 for Silverwave, whose player minimum is 340 points).
 Players honor the window’s measured top safe-area inset; the lower import pane
 does not inherit the top window inset. Amped keeps native transport controls available even when its artwork
@@ -59,14 +59,28 @@ The root owns both players and the import model, so changing pane sizes or drawe
 visibility does not recreate playback or cancel imports. Collection selection,
 search, filters and sort live in the root, too.
 
-The four retained skins are **Amped · Blue / Red**, **Signal · Dual Deck**,
-**Silverwave**, and **LiStD · Original**. Amped retains its vector boombox, live
+The five skins are **Amped · Blue / Red**, **Signal · Dual Deck**,
+**Silverwave**, **LiStD · Original** and **Cyber · Lilac**. Amped retains its vector boombox, live
 spectrum, chrome transport, shell/side/speaker/vent actions and vertical pitch
 fader. Player size still controls the artwork's fit within its real player pane.
 Silverwave retains its silver/purple panel and decorative display; Original uses
-native controls. The ear icon remains `native/Assets/EarIcon.icns`.
+native controls. Cyber (`native/CyberSkin.swift`) recreates the user-supplied lilac
+media-player reference as vector artwork in the reference's own 545 × 448 pixel space;
+outlines were traced from the image and colours sampled from it, and every hit area
+uses the same coordinates. Its wordmark reads LiStD (the reference's brand text was
+deliberately not copied). Controls: screen = live spectrum + title/artist/status (eye
+toggles the spectrum), groove knob = seek, pink ring ball = volume (+/− marks step 5%,
+speaker = mute), ◀ ▶ = speed ∓1%, tri-colour mark = speed reset, title field scrolls
+(static under Reduce Motion), time field toggles elapsed/remaining, document button =
+Tracks & imports, folder = open file, _ / X = minimize/close. Transport: |◀◀ / ▶▶|
+step through the collection pane's current filter and sort (`CollectionBrowser.neighbour`,
+no wrap at the ends; previous restarts the song after 3 s; a playing deck keeps playing),
+◀◀ / ▶▶ = ∓10 s, ‖ pause, ▶ play (empty deck: loads the first visible collection track,
+or opens a file when the collection view is empty), ■ stop. Cyber keeps the shared
+playback strip and Player size row below the artwork, like Amped.
+The ear icon remains `native/Assets/EarIcon.icns`.
 Appearance is set per skin with `NSApp.appearance` (`applyAppearance` in
-`native/Crate.swift`): Signal dark, Amped/Silverwave light, Original follows the
+`native/Crate.swift`): Signal dark, Amped/Silverwave/Cyber light, Original follows the
 system. Do not use SwiftUI `preferredColorScheme(nil)` to restore the system
 appearance; it leaves a previously forced dark window partly dark.
 
@@ -87,7 +101,7 @@ expose an All groups / named group picker. Sorting also supports Artist, BPM
 (unknown last) and Most recently added (newest first). Search applies inside the
 chosen group. A/B loading (Signal dual deck only), file-URL row dragging, Finder reveal,
 playback and manual label editing remain available. Single-deck skins (Original, Silverwave,
-Amped) show one **Load track** button per row/import result instead of A/B, and accept one
+Amped, Cyber) show one **Load track** button per row/import result instead of A/B, and accept one
 audio file dropped onto the deck panel (loads paused; non-audio and multi-file drops ignored). Label editing is still an explicit disk-changing
 action; browsing/sorting never invokes the organizer.
 
@@ -159,6 +173,7 @@ live peer availability and rate limits remain dependent on Soulseek.
 | `native/CrateSkin.swift` | Skin enum, Silverwave panels, emblem and decorative display |
 | `native/BoomboxSkin.swift` | Blue/red boombox vector artwork and central playback/fader controls |
 | `native/CratePlayer.swift` | Local AVFoundation playback engine, mute, spectrum tap and shared seek/speed/volume strip |
+| `native/CyberSkin.swift` | Cyber · Lilac vector artwork traced from the reference, its geometry/palette and live overlay controls |
 | `native/TechnicalSkin.swift` | Signal stacked waveforms, dual-deck transport and EQ controls |
 | `native/AudioSpectrum.swift` | Thread-safe audio frequency analysis and live LED spectrum rendering |
 | `native/Assets/EarIcon.icns` | User-provided application icon, copied into the bundle by each build |
@@ -175,7 +190,8 @@ live peer availability and rate limits remain dependent on Soulseek.
 | `requirements-crate.txt` | Pinned librosa 0.11.0 and NumPy/Numba/llvmlite runtime |
 | `tests/test_crate_backend.py` | Parser, pipeline, quality/identity rejection, library preservation and label/index-update checks |
 | `tests/test_music_sorter.py` | Tempo, naming, incremental sorting, collisions, moves, watch and undo checks |
-| `tests/check_crate_skin.swift` | Silverwave emblem and blue/red boombox render checks |
+| `tests/check_crate_skin.swift` | Silverwave emblem, blue/red boombox and Cyber landmark-colour/transparency/volume-ring render checks |
+| `tests/check_cyber_player.swift` | Real mouse clicks/drags on every Cyber control in an offscreen window (muted, generated silence) |
 | `tests/check_crate_player.swift` | Generated-audio playback, pause/seek/rate/end/replay, live spectrum tap and pitch response, mute and format-switch checks |
 | `tests/check_dual_deck.swift` | Generated-audio dual playback, beat-phase sync, independent EQ attenuation and source preservation |
 | `tests/test_deck_analysis.py` | Generated-pulse BPM/beat-cue detection, silence and read-only analysis |
@@ -420,8 +436,12 @@ and strict deep signature verification after extraction.
 .music-sorter/audio-env/bin/python -m unittest discover -s tests -v
 
 # Native skin/logo check after visual changes.
-swiftc -parse-as-library native/CrateSkin.swift native/CratePlayer.swift native/BoomboxSkin.swift native/AudioSpectrum.swift tests/check_crate_skin.swift -o .music-sorter/build/check-skin
+swiftc -parse-as-library native/CrateSkin.swift native/CratePlayer.swift native/BoomboxSkin.swift native/AudioSpectrum.swift native/CyberSkin.swift tests/check_crate_skin.swift -o .music-sorter/build/check-skin
 .music-sorter/build/check-skin
+
+# Cyber control interaction check (offscreen window, synthetic mouse events).
+swiftc -parse-as-library native/CratePlayer.swift native/AudioSpectrum.swift native/CyberSkin.swift tests/check_cyber_player.swift -o .music-sorter/build/check-cyber-player
+.music-sorter/build/check-cyber-player
 
 # Muted native playback checks using temporary generated WAV files.
 swiftc -parse-as-library native/CratePlayer.swift native/AudioSpectrum.swift tests/check_crate_player.swift -o .music-sorter/build/check-player
