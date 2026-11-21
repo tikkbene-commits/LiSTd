@@ -591,3 +591,14 @@ rather than reconstruct every past chat message.
   asset digest matches the previously validated ZIP SHA-256. No app/runtime source
   changed; no app rebuild, full playback/audio suite, library scan, credential change
   or live download was needed for this documentation/release work.
+
+## 2026-11-21 — Single view: one Load track button and deck drag-and-drop
+
+- In single-deck skins (Original, Silverwave, Amped), collection rows and import results
+  now show one **Load track** button that loads into the visible deck, replacing A/B.
+- Dropping one audio file onto the single deck panel loads it paused. Non-audio,
+  folders, remote URLs and multi-file drops are ignored. The drop logic is now shared
+  with Signal (`CratePlayer.loadDroppedAudio`); Signal's A/B behavior is unchanged.
+- Validation: `./build-crate` succeeded; check-player (new drop, rejected-drop,
+  independent-deck and corrupt-file cases), check-dual-deck and check-skin passed.
+  Manual in-app click/drag testing was not performed by the agent.
