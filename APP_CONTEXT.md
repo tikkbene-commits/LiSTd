@@ -76,7 +76,8 @@ Tracks & imports, folder = open file, _ / X = minimize/close. Transport: |◀◀
 step through the collection pane's current filter and sort (`CollectionBrowser.neighbour`,
 no wrap at the ends; previous restarts the song after 3 s; a playing deck keeps playing),
 ◀◀ / ▶▶ = ∓10 s, ‖ pause, ▶ play (empty deck: loads the first visible collection track,
-or opens a file when the collection view is empty), ■ stop. Cyber keeps the shared
+or opens a file when the collection view is empty), ■ stop. Screen and field text keep minimum
+legible sizes (9/8/7.5/7 pt) when Player size shrinks the artwork. Cyber keeps the shared
 playback strip and Player size row below the artwork, like Amped.
 The ear icon remains `native/Assets/EarIcon.icns`.
 Appearance is set per skin with `NSApp.appearance` (`applyAppearance` in

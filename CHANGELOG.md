@@ -5,6 +5,35 @@ decisions, validation performed and any checks skipped. Keep this history factua
 the initial entries below summarize retained source, local records and this session,
 rather than reconstruct every past chat message.
 
+## 2026-11-21 — Cyber · Lilac end-to-end testing
+
+- Ran the real `CrateView` (real model, backend snapshot and fixture collection)
+  offscreen in a throwaway test bundle with its own bundle ID, root = the worktree's
+  three generated test tones. Clicks went to the skin's reference coordinates and
+  state was read back from rendered pixels with on-device text recognition. 20
+  checks passed: Play on an empty deck loads the first collection track; the clock
+  advances; next keeps playing; previous within 3 s steps back, after 3 s restarts;
+  next stops at the last track; paused stepping stays paused; stop; drawer open and
+  close (skin rescales and still plays); play at the 800 × 720 minimum window, at
+  45% Player size and at 1600 × 1050; Amped → Cyber round trip keeps the deck. The
+  harness is scratch tooling and is not committed (it strips `@main` from a copy of
+  `Crate.swift`).
+- Fix: at small Player sizes the screen and field text fell to about 3 pt and could
+  not be read. Screen title/artist/status and the field text now keep minimum
+  legible sizes (9/8/7.5/7 pt).
+- `check_cyber_player` now also checks arrow keys on the focused volume ring (+5%)
+  and seek knob (+5 s); passed. Skin and collection checks and both-architecture
+  `./build-crate` passed again. The rebuilt LiStD.app launched on the Cyber skin,
+  stayed running for 8 s and quit with no crash report; the saved skin was restored
+  to Original.
+- Test-only incident: during harness setup, a titled test window was moved onto the
+  visible screen by macOS for a few seconds before it was made transparent and
+  pinned offscreen. Harness crash reports in DiagnosticReports are from early
+  harness runs (`fatalError` timeouts and an invalid key), not from LiStD.
+- Still not done: clicking in the visible app window (no Screen Recording or
+  Accessibility permission for this session). Pushing the branch was blocked by a
+  permission check.
+
 ## 2026-11-21 — Cyber · Lilac skin
 
 - Added **Cyber · Lilac** (`native/CyberSkin.swift`), a fifth skin recreating the
