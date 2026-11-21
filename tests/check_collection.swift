@@ -32,10 +32,23 @@ import Foundation
         precondition(browser.groups(for: rows[2]) == ["Unknown artist"])
         browser.collectionView = "Import / tracklist"
         precondition(browser.groups(for: rows[2]) == ["No import record"])
+        // Previous/next follow the visible order and stop at both ends.
+        var stepper = CollectionBrowser(tracks: rows)
+        precondition(stepper.neighbour(of: "/fixture/a.flac", offset: 1)?.id == "b")
+        precondition(stepper.neighbour(of: "/fixture/b.flac", offset: -1)?.id == "a")
+        precondition(stepper.neighbour(of: "/fixture/c.flac", offset: 1) == nil, "Next must stop at the last row")
+        precondition(stepper.neighbour(of: "/fixture/a.flac", offset: -1) == nil, "Previous must stop at the first row")
+        precondition(stepper.neighbour(of: "/elsewhere.flac", offset: 1)?.id == "a")
+        precondition(stepper.neighbour(of: "", offset: -1)?.id == "c")
+        stepper.collectionSort = "Most recently added"
+        precondition(stepper.neighbour(of: "/fixture/c.flac", offset: 1)?.id == "b", "Stepping must follow the sort")
+        stepper.search = "Alpha"
+        precondition(stepper.neighbour(of: "/fixture/b.flac", offset: 1) == nil, "Stepping must stay inside the filter")
+        precondition(CollectionBrowser(tracks: []).neighbour(of: "", offset: 1) == nil)
         let old = try JSONDecoder().decode(LibraryTrack.self, from: Data("""
         {"id":"old","artist":"","title":"Old","genre":"","vibe":"Needs Review","path":"/old.flac"}
         """.utf8))
         precondition(old.added_at == nil && old.download_folder == nil && old.imports == nil)
-        print("Collection checks passed: default, natural title/artist/BPM/date order, folder/import/genre/artist groups, scoped search, missing metadata and legacy decoding.")
+        print("Collection checks passed: default, natural title/artist/BPM/date order, folder/import/genre/artist groups, scoped search, previous/next stepping, missing metadata and legacy decoding.")
     }
 }
