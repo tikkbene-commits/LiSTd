@@ -1,5 +1,17 @@
 # MUSIC folder instructions
 
+## Git workflow (always follow)
+
+- Never commit or push directly to `main`.
+- At the start of every task, run `git status`. If there is unsaved work, save it in a commit on its own backup branch first. Then create a branch named `change/<short-description>` for the task.
+- Commit small and often, with plain-English messages, including work in progress.
+- When done, push the branch and open a pull request.
+- Never merge, force-push, delete branches or rewrite history unless the user explicitly says to do so.
+- Before any risky change, create a backup branch or tag.
+- If several agent windows work at once, each must use its own Git worktree and branch.
+- After every task, reply in exactly three lines: what changed, the branch name, and how to undo it.
+- Keep following the `CHANGELOG.md` and `APP_CONTEXT.md` rules below.
+
 ## Start here in a new chat
 
 - This folder contains the **LiSTd** macOS app (formerly Crate) and the existing music collection. Before editing the app, read `APP_CONTEXT.md`, the recent entries in `CHANGELOG.md`, and the relevant sections of `CRATE.md` / `MUSIC_SORTER.md`. These files are the project handoff; do not assume a new chat has the old conversation.
