@@ -88,6 +88,26 @@ import AVFoundation
         drag(from: CGPoint(x: CyberGeometry.seekStart, y: CyberGeometry.seekY), to: CGPoint(x: middle, y: CyberGeometry.seekY))
         precondition(abs(player.position - 10) < 0.6, "Seek knob drag: \(player.position)")
 
+        // Keyboard: after clicking a control it takes focus, and arrow keys adjust it.
+        func key(_ code: UInt16, _ characters: String) {
+            for type in [NSEvent.EventType.keyDown, .keyUp] {
+                window.sendEvent(NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                  windowNumber: window.windowNumber, context: nil, characters: characters,
+                                                  charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)!)
+            }
+            pump()
+        }
+        let up = String(UnicodeScalar(NSUpArrowFunctionKey)!), right = String(UnicodeScalar(NSRightArrowFunctionKey)!)
+        player.volume = 0.5
+        click(CyberGeometry.volumePoint(0.5).x, CyberGeometry.volumePoint(0.5).y)
+        key(126, up)
+        precondition(abs(player.volume - 0.55) < 0.011, "Up arrow raises volume when the ring is focused: \(player.volume)")
+        let before = player.position
+        click(CyberGeometry.seekStart + (CyberGeometry.seekEnd - CyberGeometry.seekStart) * CGFloat(before / player.duration), CyberGeometry.seekY)
+        let clicked = player.position
+        key(124, right)
+        precondition(abs(player.position - (clicked + 5)) < 0.6, "Right arrow seeks +5 s when the knob is focused: \(clicked) → \(player.position)")
+
         // Snapshot of the live controls over the artwork for visual review.
         player.seek(to: 7)
         pump(0.4)
@@ -96,6 +116,6 @@ import AVFoundation
             try? FileManager.default.createDirectory(atPath: ".music-sorter/build", withIntermediateDirectories: true)
             try bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: ".music-sorter/build/cyber-live.png"))
         }
-        print("Cyber controls passed: play/pause/stop, ±10 s, previous/next, playlist, spectrum eye, speed arrows and reset, volume marks/drag, mute and seek drag.")
+        print("Cyber controls passed: play/pause/stop, ±10 s, previous/next, playlist, spectrum eye, speed arrows and reset, volume marks/drag, mute, seek drag and arrow keys on the focused ring/knob.")
     }
 }

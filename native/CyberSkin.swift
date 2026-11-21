@@ -603,6 +603,8 @@ struct CyberPlayer: View {
         .onReceive(clock) { _ in if scrub == nil { player.updatePosition() } }
     }
 
+    private func legible(_ size: CGFloat, _ minimum: CGFloat) -> CGFloat { max(size, minimum) }
+
     private func place<V: View>(_ view: V, _ x: CGFloat, _ y: CGFloat, _ width: CGFloat, _ height: CGFloat, _ s: CGFloat) -> some View {
         view.frame(width: width * s, height: height * s).position(x: x * s, y: y * s)
     }
@@ -629,12 +631,13 @@ struct CyberPlayer: View {
                     .opacity(0.9)
             }
             VStack(alignment: .leading, spacing: 2 * s) {
-                Text(player.title).font(.system(size: (player.spectrumVisible ? 11 : 15) * s, weight: .bold, design: .rounded))
+                // Text keeps a legible minimum size when the player is scaled down.
+                Text(player.title).font(.system(size: legible((player.spectrumVisible ? 11 : 15) * s, 9), weight: .bold, design: .rounded))
                     .foregroundStyle(Color(hex: 0xe6e8fb)).lineLimit(player.spectrumVisible ? 1 : 2)
-                Text(player.artist).font(.system(size: (player.spectrumVisible ? 8 : 10) * s, weight: .medium, design: .rounded))
+                Text(player.artist).font(.system(size: legible((player.spectrumVisible ? 8 : 10) * s, 8), weight: .medium, design: .rounded))
                     .foregroundStyle(Color(hex: 0xa3a8d8)).lineLimit(1)
-                Text(status).font(.system(size: 6.5 * s, weight: .medium, design: .monospaced))
-                    .foregroundStyle(Color(hex: 0x8f94c8)).lineLimit(1)
+                Text(status).font(.system(size: legible(6.5 * s, 7.5), weight: .medium, design: .monospaced))
+                    .foregroundStyle(Color(hex: 0x8f94c8)).lineLimit(1).minimumScaleFactor(0.8)
                 Spacer(minLength: 0)
             }
             .padding(7 * s)
@@ -652,11 +655,11 @@ struct CyberPlayer: View {
         let label = player.loaded ? (player.artist.isEmpty ? player.title : "\(player.title) – \(player.artist)") : "Choose a track"
         let position = player.loaded ? (showRemaining ? "-" + CratePlayer.clock(max(0, player.duration - player.position)) : CratePlayer.clock(player.position)) : "0:00"
         return ZStack(alignment: .topLeading) {
-            place(CyberMarquee(text: label, font: .system(size: 8.5 * s, weight: .semibold, design: .rounded), colour: CyberPalette.ink)
+            place(CyberMarquee(text: label, font: .system(size: legible(8.5 * s, 7), weight: .semibold, design: .rounded), colour: CyberPalette.ink)
                 .padding(.horizontal, 4 * s).allowsHitTesting(false), title.midX, title.midY, title.width, title.height, s)
             place(CyberHit(name: showRemaining ? "Show elapsed time" : "Show remaining time",
                            shape: RoundedRectangle(cornerRadius: 3 * s), action: { showRemaining.toggle() }) {
-                Text(position).font(.system(size: 9 * s, weight: .semibold, design: .monospaced))
+                Text(position).font(.system(size: legible(9 * s, 7), weight: .semibold, design: .monospaced))
                     .foregroundStyle(CyberPalette.ink).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
             }, time.midX, time.midY, time.width, time.height, s)
         }
