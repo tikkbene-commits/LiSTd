@@ -376,6 +376,7 @@ struct CrateView: View {
     @State private var minimum = 320
     @State private var automatic = true
     @State private var targeted = false
+    @State private var singleDeckDropTargeted = false
     @State private var search = ""
     @State private var technicalSelection: LibraryTrack.ID?
     @State private var collectionView = "All tracks"
@@ -482,21 +483,28 @@ struct CrateView: View {
     @ViewBuilder var mixer: some View {
         if skin == .technical {
             ScrollView(.vertical) { TechnicalPlayer(a: player, b: deckB, analyze: analyzeDeck).frame(maxWidth: .infinity) }
-        } else if skin == .boombox { boombox }
-        else if skin == .silverwave {
-            VStack(spacing: 12) {
-                SilverwaveDisplay(title: player.title, subtitle: player.artist, count: "LiStD · SILVERWAVE")
-                Spacer(minLength: 0)
-                PlaybackStrip(player: player)
-            }.padding(14).modifier(MetalPanel(radius: 18))
         } else {
-            VStack {
-                Text("LiStD").font(.largeTitle)
-                Text(player.title).font(.title2).lineLimit(2)
-                Text(player.artist).foregroundStyle(.secondary).lineLimit(2)
-                Spacer(minLength: 0)
-                PlaybackStrip(player: player)
-            }.padding()
+            Group {
+                if skin == .boombox { boombox }
+                else if skin == .silverwave {
+                    VStack(spacing: 12) {
+                        SilverwaveDisplay(title: player.title, subtitle: player.artist, count: "LiStD · SILVERWAVE")
+                        Spacer(minLength: 0)
+                        PlaybackStrip(player: player)
+                    }.padding(14).modifier(MetalPanel(radius: 18))
+                } else {
+                    VStack {
+                        Text("LiStD").font(.largeTitle)
+                        Text(player.title).font(.title2).lineLimit(2)
+                        Text(player.artist).foregroundStyle(.secondary).lineLimit(2)
+                        Spacer(minLength: 0)
+                        PlaybackStrip(player: player)
+                    }.padding()
+                }
+            }
+            .contentShape(Rectangle())
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(singleDeckDropTargeted ? skin.accent : .clear, lineWidth: 2))
+            .onDrop(of: [UTType.fileURL.identifier], isTargeted: $singleDeckDropTargeted, perform: player.loadDroppedAudio)
         }
     }
 
@@ -557,14 +565,20 @@ struct CrateView: View {
                         Text("\(track.artist.isEmpty ? "Unknown artist" : track.artist) · \(track.genre)")
                             .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }.padding(.vertical, 5).help("\(track.artist) — \(track.title) / \(track.genre)")
-                }.width(max(80, geometry.size.width - 200))
+                }.width(max(80, geometry.size.width - (skin == .technical ? 200 : 224)))
                 TableColumn("BPM") { track in Text(track.bpm.map { String(format: "%.1f", $0) } ?? "—").monospacedDigit() }.width(44)
                 TableColumn("Deck") { track in
                     HStack(spacing: 5) {
-                        Button("A") { loadDeck(player, track: track) }.help("Load \(track.title) into deck A, paused").accessibilityLabel("Load \(track.title) into deck A")
-                        Button("B") { loadDeck(deckB, track: track) }.help("Load \(track.title) into deck B, paused").accessibilityLabel("Load \(track.title) into deck B")
+                        if skin == .technical {
+                            Button("A") { loadDeck(player, track: track) }.help("Load \(track.title) into deck A, paused").accessibilityLabel("Load \(track.title) into deck A")
+                            Button("B") { loadDeck(deckB, track: track) }.help("Load \(track.title) into deck B, paused").accessibilityLabel("Load \(track.title) into deck B")
+                        } else {
+                            Button("Load track") { loadDeck(player, track: track) }
+                                .help("Load \(track.title) into the visible deck, paused")
+                                .accessibilityLabel("Load \(track.title) into the visible deck")
+                        }
                     }.buttonStyle(.bordered).controlSize(.small)
-                }.width(72)
+                }.width(skin == .technical ? 72 : 96)
             } rows: {
                 ForEach(filtered) { track in
                     TableRow(track).itemProvider { NSItemProvider(object: URL(fileURLWithPath: track.path) as NSURL) }
@@ -768,8 +782,10 @@ struct CrateView: View {
                     Text(track.note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 8)], alignment: .leading, spacing: 8) {
                         if ["ready", "existing"].contains(track.status), !track.path.isEmpty {
-                            Button("Load A") { player.play(path: track.path, title: track.title, artist: track.artist, autoplay: false, bpm: track.bpm) }
-                            Button("Load B") { deckB.play(path: track.path, title: track.title, artist: track.artist, autoplay: false, bpm: track.bpm) }
+                            Button(skin == .technical ? "Load A" : "Load track") { player.play(path: track.path, title: track.title, artist: track.artist, autoplay: false, bpm: track.bpm) }
+                            if skin == .technical {
+                                Button("Load B") { deckB.play(path: track.path, title: track.title, artist: track.artist, autoplay: false, bpm: track.bpm) }
+                            }
                             Button("Show in Finder") { model.reveal(track.path) }
                             Text(track.quality ?? "").font(.caption)
                             if let id = track.track_id {

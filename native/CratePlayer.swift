@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import UniformTypeIdentifiers
 
 // SwiftUI's macOS slider can animate its tracking overlay from the hosting origin.
 // Keep the control and its tracking in one native coordinate space at every size.
@@ -322,6 +323,24 @@ final class TrackingSlider: NSSlider {
 
     func updatePosition() {
         if isPlaying { position = currentPosition }
+    }
+
+    func loadDroppedAudio(_ providers: [NSItemProvider]) -> Bool {
+        guard providers.count == 1, let provider = providers.first else { return false }
+        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+            let url: URL?
+            if let data = item as? Data { url = URL(dataRepresentation: data, relativeTo: nil) }
+            else if let value = item as? URL { url = value }
+            else if let value = item as? String { url = URL(string: value) }
+            else { url = nil }
+            guard let url, url.isFileURL,
+                  let type = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType,
+                  type.conforms(to: .audio) else { return }
+            Task { @MainActor in
+                self.play(path: url.path, title: "", artist: "Local audio", autoplay: false)
+            }
+        }
+        return true
     }
 
     func openFile(autoplay: Bool = true) {

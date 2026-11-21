@@ -85,8 +85,10 @@ initial UI capture; do not claim a frame-by-frame reproduction from that capture
 All tracks, Download folder, Import / tracklist, Genre and Artist. Grouped views
 expose an All groups / named group picker. Sorting also supports Artist, BPM
 (unknown last) and Most recently added (newest first). Search applies inside the
-chosen group. A/B loading, file-URL row dragging, Finder reveal, playback and manual
-label editing remain available. Label editing is still an explicit disk-changing
+chosen group. A/B loading (Signal dual deck only), file-URL row dragging, Finder reveal,
+playback and manual label editing remain available. Single-deck skins (Original, Silverwave,
+Amped) show one **Load track** button per row/import result instead of A/B, and accept one
+audio file dropped onto the deck panel (loads paused; non-audio and multi-file drops ignored). Label editing is still an explicit disk-changing
 action; browsing/sorting never invokes the organizer.
 
 `native/Collection.swift` holds the read-only display calculation. Snapshot metadata

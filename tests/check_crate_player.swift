@@ -1,5 +1,7 @@
 import Foundation
 import AVFoundation
+import AppKit
+import UniformTypeIdentifiers
 
 @main struct CratePlayerCheck {
     @MainActor static func main() async throws {
@@ -114,6 +116,36 @@ import AVFoundation
             try await Task.sleep(for: .milliseconds(20))
         }
         precondition(!player.waveform.isEmpty && player.waveform.allSatisfy { $0 == 0 }, "Stale waveform replaced the new track")
+        let otherDeck = CratePlayer()
+        otherDeck.volume = 0
+        otherDeck.play(path: stereoURL.path, title: "Other deck", artist: "Fixture", autoplay: false)
+        let provider = NSItemProvider(object: url as NSURL)
+        precondition(!player.loadDroppedAudio([]) && !player.loadDroppedAudio([provider, provider]), "Only one dropped file is allowed")
+        precondition(player.loadDroppedAudio([provider]))
+        for _ in 0..<100 {
+            if player.path == url.path { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        precondition(player.path == url.path && player.title == "tone" && !player.isPlaying && player.position == 0, "Dropped audio did not load paused")
+        precondition(otherDeck.path == stereoURL.path && !otherDeck.isPlaying, "Drop changed the other deck")
+        let textURL = directory.appendingPathComponent("not-audio.txt")
+        try Data("Not audio".utf8).write(to: textURL)
+        for rejectedURL in [textURL, directory, URL(string: "https://example.com/tone.wav")!] {
+            _ = player.loadDroppedAudio([NSItemProvider(object: rejectedURL as NSURL)])
+            try await Task.sleep(for: .milliseconds(150))
+            precondition(player.path == url.path && player.error == nil, "Non-audio drop changed the loaded track")
+        }
+        let corruptURL = directory.appendingPathComponent("corrupt.wav")
+        try Data("Not a WAV".utf8).write(to: corruptURL)
+        _ = player.loadDroppedAudio([NSItemProvider(object: corruptURL as NSURL)])
+        for _ in 0..<100 {
+            if player.error != nil { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        precondition(player.error != nil && player.path == url.path && !player.isPlaying, "Unreadable audio must report an error and preserve the loaded track")
+        let afterDrop = try Data(contentsOf: url)
+        precondition(afterDrop == original, "Dropping modified the source audio")
+        player.error = nil
         if CommandLine.arguments.count > 1 {
             let fixtures = URL(fileURLWithPath: CommandLine.arguments[1])
             for audio in try FileManager.default.contentsOfDirectory(at: fixtures, includingPropertiesForKeys: nil).sorted(by: { $0.path < $1.path }) {
@@ -131,6 +163,6 @@ import AVFoundation
                 print("Format playback passed: \(audio.lastPathComponent)")
             }
         }
-        print("Player checks passed: load, play/pause, seek, 0.5×/1.5× rate, pitch, end/replay, stop, channel/sample-rate switch, invalid path, unchanged source.")
+        print("Player checks passed: load, play/pause, seek, 0.5×/1.5× rate, pitch, end/replay, stop, channel/sample-rate switch, invalid path, single-file drop, rejected drops, independent decks, unchanged source.")
     }
 }
