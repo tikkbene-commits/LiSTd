@@ -50,4 +50,14 @@ struct CollectionBrowser {
         }
     }
 
+    /// The track `offset` rows from `path` in the visible order, or nil past either end.
+    /// A path not in this view starts from the first row (forward) or last row (backward).
+    func neighbour(of path: String, offset: Int) -> LibraryTrack? {
+        let tracks = visibleTracks
+        guard !tracks.isEmpty, offset != 0 else { return nil }
+        guard let index = tracks.firstIndex(where: { $0.path == path }) else { return offset > 0 ? tracks.first : tracks.last }
+        let target = index + offset
+        return tracks.indices.contains(target) ? tracks[target] : nil
+    }
+
 }
