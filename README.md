@@ -15,7 +15,7 @@ A native Mac app for collecting, organizing and auditioning music for your next 
 
 <img src="docs/images/amped.png" alt="LiStD’s Amped skin: a blue boombox with red lettering, playback controls and a pitch fader" width="760">
 
-<sub>Amped · Blue / Red — one of four built-in skins. Interface previews use generated example audio.</sub>
+<sub>Amped · Blue / Red — one of five built-in skins. Interface previews use generated example audio.</sub>
 
 </div>
 
@@ -138,7 +138,7 @@ Missing tracks offer individual or batch **Deep search**, with bounded fallback
 queries and ambiguous candidates held for review. Original import fields and all
 quality/verification checks remain in effect.
 
-## Four ways to listen
+## Five ways to listen
 
 | Skin | Feel |
 | --- | --- |
@@ -146,6 +146,7 @@ quality/verification checks remain in effect.
 | **Signal · Dual Deck** | Two decks, stacked waveforms, beat cues, tempo/phase sync and three-band cut EQ |
 | **Silverwave** | Silver and purple, with a classic media-player feel |
 | **LiStD · Original** | The straightforward native macOS workspace |
+| **Cyber · Lilac** | A sculpted lilac player with a volume ring, live spectrum screen and a transport ring that steps through your collection |
 
 Switch with the **Skin** menu. Your library and imports stay available across skins.
 Playback supports play/pause, stop, seeking, volume and **0.5×–1.5× speed**. Speed also

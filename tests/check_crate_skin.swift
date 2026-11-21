@@ -38,6 +38,40 @@ import AppKit
         precondition(greenPixels == 0, "Reference green must become blue")
         let png = boxPixels.representation(using: .png, properties: [:])!
         try! png.write(to: URL(fileURLWithPath: ".music-sorter/build/boombox-preview.png"))
+        // Cyber · Lilac: sample landmarks at the reference's own pixel coordinates.
+        let cyber = ImageRenderer(content: CyberArtwork().frame(width: CyberGeometry.width, height: CyberGeometry.height))
+        cyber.scale = 1
+        guard let cyberImage = cyber.cgImage else { fatalError("Cyber artwork did not render") }
+        precondition(cyberImage.width == 545 && cyberImage.height == 448)
+        let cyberPixels = NSBitmapImageRep(cgImage: cyberImage)
+        func rgb(_ x: Int, _ y: Int) -> (r: CGFloat, g: CGFloat, b: CGFloat, a: CGFloat) {
+            let c = cyberPixels.colorAt(x: x, y: y)!.usingColorSpace(.sRGB)!
+            return (c.redComponent, c.greenComponent, c.blueComponent, c.alphaComponent)
+        }
+        let screen = rgb(160, 120)
+        precondition(screen.a > 0.99 && screen.r + screen.g + screen.b < 0.05, "Cyber screen must be black")
+        let lilac = rgb(300, 200)
+        precondition(lilac.b > lilac.r && lilac.b > lilac.g && lilac.r > 0.55, "Cyber body lost its lilac")
+        let ring = rgb(522, 150)
+        precondition(ring.r > ring.g + 0.08 && ring.b > ring.g + 0.04, "Cyber volume ring lost its pink")
+        let lowerRing = rgb(170, 340)
+        precondition(lowerRing.r > lowerRing.g + 0.08, "Cyber lower ring lost its pink")
+        let band = rgb(251, 316)
+        precondition(band.r > band.b + 0.06 && band.g > band.b + 0.03, "Cyber transport band lost its cream")
+        let bowl = rgb(343, 375)
+        precondition(bowl.b > bowl.r + 0.05 && bowl.g > bowl.r + 0.03, "Cyber bowl lost its teal")
+        for (x, y) in [(343, 285), (320, 300), (5, 5), (510, 250), (120, 300)] {
+            precondition(rgb(x, y).a < 0.05, "Cyber artwork must stay transparent at \(x),\(y)")
+        }
+        precondition(CrateSkin.cyber.title == "Cyber · Lilac" && CrateSkin.cyber.isArtwork && !CrateSkin.classic.isArtwork)
+        // The volume ball follows the ring: "+" at full, "−" at silent, monotonic in between.
+        let loud = CyberGeometry.volumePoint(1), quiet = CyberGeometry.volumePoint(0)
+        precondition(hypot(loud.x - 400, loud.y - 44) < 6 && hypot(quiet.x - 518, quiet.y - 140) < 6)
+        for volume in stride(from: 0.0, through: 1.0, by: 0.05) {
+            precondition(abs(CyberGeometry.volume(at: CyberGeometry.volumePoint(volume)) - volume) < 0.01)
+        }
+        try! cyberPixels.representation(using: .png, properties: [:])!
+            .write(to: URL(fileURLWithPath: ".music-sorter/build/cyber-preview.png"))
         var pitch = 1.0
         let host = NSHostingView(rootView: VerticalPitchSlider(value: Binding(get: { pitch }, set: { pitch = $0 }), scale: 2)
             .frame(width: 28, height: 72))
@@ -53,6 +87,6 @@ import AppKit
         precondition(window.makeFirstResponder(control) && window.firstResponder === control)
         precondition(control.accessibilityPerformIncrement() && abs(pitch - 1.01) < 0.0001)
         precondition(control.accessibilityPerformDecrement() && abs(pitch - 1) < 0.0001)
-        print("Silverwave/Amped render and native vertical fader focus/accessibility checks passed.")
+        print("Silverwave/Amped/Cyber render, Cyber volume ring and native vertical fader focus/accessibility checks passed.")
     }
 }

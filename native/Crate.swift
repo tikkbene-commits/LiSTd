@@ -393,7 +393,7 @@ struct CrateView: View {
             technicalCollection.frame(minWidth: 310, idealWidth: 390, maxWidth: 650)
             VSplitView {
                 mixer.padding(.top, geometry.safeAreaInsets.top)
-                    .frame(minWidth: 440, minHeight: skin == .boombox ? 400 : skin == .silverwave ? 340 : 230, maxHeight: .infinity)
+                    .frame(minWidth: 440, minHeight: skin.isArtwork ? 400 : skin == .silverwave ? 340 : 230, maxHeight: .infinity)
                 if showWorkspace {
                     importDrawer.ignoresSafeArea(.container, edges: .top)
                         .frame(minWidth: 440, minHeight: 240, idealHeight: 340)
@@ -403,7 +403,7 @@ struct CrateView: View {
         }
         }
         .tint(skin.accent)
-        .frame(minWidth: 800, minHeight: skin == .boombox ? 720 : skin == .silverwave ? 680 : 620)
+        .frame(minWidth: 800, minHeight: skin.isArtwork ? 720 : skin == .silverwave ? 680 : 620)
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 Button { model.showAccount = true } label: { Label(model.configured ? model.accountUsername : "Sign in to Soulseek", systemImage: "person.crop.circle") }
@@ -486,6 +486,7 @@ struct CrateView: View {
         } else {
             Group {
                 if skin == .boombox { boombox }
+                else if skin == .cyber { cyber }
                 else if skin == .silverwave {
                     VStack(spacing: 12) {
                         SilverwaveDisplay(title: player.title, subtitle: player.artist, count: "LiStD · SILVERWAVE")
@@ -646,13 +647,44 @@ struct CrateView: View {
                     .frame(width: geometry.size.width, height: geometry.size.height)
             }.frame(minHeight: 211).clipped()
             PlaybackStrip(player: player)
-            HStack {
-                Text("Player size").font(.caption)
-                StableSlider(value: $playerSize, in: 0.45...1).frame(minWidth: 60, maxWidth: 160).accessibilityLabel("Player size")
-                Text("\(Int(playerSize * 100))%").monospacedDigit().frame(width: 38)
-                Button("Fill window") { playerSize = 1 }
-            }.padding(.horizontal).padding(.bottom, 8)
+            playerSizeControls
         }.background(LinearGradient(colors: [Color(red: 0.90, green: 0.94, blue: 0.97), .white, Color(red: 0.59, green: 0.68, blue: 0.78)], startPoint: .top, endPoint: .bottom))
+    }
+
+    var playerSizeControls: some View {
+        HStack {
+            Text("Player size").font(.caption)
+            StableSlider(value: $playerSize, in: 0.45...1).frame(minWidth: 60, maxWidth: 160).accessibilityLabel("Player size")
+            Text("\(Int(playerSize * 100))%").monospacedDigit().frame(width: 38)
+            Button("Fill window") { playerSize = 1 }
+        }.padding(.horizontal).padding(.bottom, 8)
+    }
+
+    var cyber: some View {
+        VStack(spacing: 8) {
+            GeometryReader { geometry in
+                CyberPlayer(player: player, canStep: !browser.visibleTracks.isEmpty, step: stepCollection,
+                            showTracks: { showWorkspace.toggle() })
+                    .frame(width: geometry.size.width * playerSize, height: geometry.size.height * playerSize)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+            }.frame(minHeight: 240).clipped()
+            PlaybackStrip(player: player)
+            playerSizeControls
+        }.background(LinearGradient(colors: [Color(red: 0.97, green: 0.97, blue: 0.99), Color(red: 0.85, green: 0.86, blue: 0.93)], startPoint: .top, endPoint: .bottom))
+    }
+
+    /// Previous/next for single-deck skins: steps through the collection pane in its
+    /// current filter and sort. Previous restarts the song after 3 seconds of play.
+    func stepCollection(_ offset: Int, autoplay: Bool) {
+        player.updatePosition()
+        if offset < 0, player.loaded, player.position > 3 { player.seek(to: 0); return }
+        guard let track = browser.neighbour(of: player.path, offset: offset) else {
+            if offset < 0, player.loaded { player.seek(to: 0) }
+            return
+        }
+        player.play(path: track.path, title: track.title, artist: track.artist, autoplay: autoplay, bpm: track.bpm)
+        technicalSelection = track.id
+        analyzeDeck(player)
     }
 
     var importView: some View {
