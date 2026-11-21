@@ -1,11 +1,13 @@
-# Sharing LiSTd
+# Sharing LiStD
 
 For an installation guide to send to a friend, use [INSTALL.md](INSTALL.md).
 The repository overview and download button are in [README.md](README.md).
 The tested Mac ZIP is also attached to the repository's v1.4.1 GitHub release;
 access to it follows the repository's visibility. Source licensing is in [LICENSE](LICENSE).
 
-Send **release/LiSTd-Mac.zip**. It contains one universal app, both Python/audio runtimes,
+The current source packages as **release/LiStD-Mac.zip**. That new package has not
+been built or published in this update; the existing public v1.4.1 archive remains
+**LiSTd-Mac.zip**. After separately validating a new package, send that archive. It contains one universal app, both Python/audio runtimes,
 Sockseek 3.0.6, audio-only FFmpeg 8.0 tools, notices and build sources. It contains no
 saved account, music collection, downloads, imports or organizer catalog.
 
@@ -13,9 +15,9 @@ Recipients need an **Intel or Apple Silicon Mac running macOS 14 or newer**, an 
 Soulseek account and an internet connection. The app selects its native runtime;
 Intel Macs do not need Rosetta. Windows and macOS 13 or older are unsupported.
 
-1. Unzip, open the LiSTd folder and drag LiSTd.app into Applications. Read the
+1. Unzip, open the LiStD folder and drag LiStD.app into Applications. Read the
    included READ ME FIRST.txt for installation and first-open approval.
-2. Open LiSTd and sign in with the Soulseek username and password. The first check
+2. Open LiStD and sign in with the Soulseek username and password. The first check
    makes a print-only Soulseek search; it never downloads audio.
 3. Import a tracklist. Downloads and app state live in **~/Music/LiSTd/**. No Terminal,
    Homebrew, Python installation or separate Sockseek installation is needed.
@@ -25,7 +27,7 @@ in this Mac's Keychain. Sockseek gets a mode-600 config in a temporary mode-700
 directory during login/import; normal completion or failure removes it. An abrupt
 OS crash or forced process kill can leave this private temporary file until macOS
 cleans temporary storage. Global ~/.config/sockseek/sockseek.conf is never changed.
-Signing out removes only LiSTd's Keychain entry and keeps downloaded music/history.
+Signing out removes only LiStD's Keychain entry and keeps downloaded music/history.
 Account changes are disabled during imports. Playback remains usable without login.
 Close another Soulseek client using the same account before signing in or importing.
 
@@ -34,7 +36,7 @@ Close another Soulseek client using the same account before signing in or import
 This workspace currently has no Developer ID certificate. The default archive is
 ad-hoc signed and **not notarized**. A downloaded copy may be blocked by Gatekeeper.
 After trying to open it, use **System Settings → Privacy & Security → Open Anyway**
-for LiSTd, then confirm Open. Managed Macs can prohibit this. Do not disable Gatekeeper.
+for LiStD, then confirm Open. Managed Macs can prohibit this. Do not disable Gatekeeper.
 
 For ordinary first-open distribution, the publisher needs an Apple Developer ID
 Application certificate and notarization access. Install that identity in the build
@@ -48,7 +50,7 @@ LISTD_NOTARY_PROFILE='your-notarytool-profile' ./package-crate
 The package command signs with the hardened runtime, verifies nested code, submits
 the ZIP to Apple, staples the ticket and recreates the ZIP. It fails on a rejected
 submission. Developer ID/notarization cannot be tested without those credentials.
-Keychain can also ask users to authorize LiSTd after replacing an ad-hoc build;
+Keychain can also ask users to authorize LiStD after replacing an ad-hoc build;
 a stable Developer ID identity avoids needless identity changes between releases.
 
 ## Build and verify
@@ -83,7 +85,7 @@ not replace a physical Intel Mac/macOS 14 acceptance test. Developer ID/notariza
 and quarantined first-open still need publisher credentials and target-Mac testing.
 Real Soulseek sign-in and Keychain save/reload were verified in the previous login fix.
 
-The root LiSTd.app remains the development build beside its source and existing MUSIC
+The root LiStD.app remains the development build beside its source and existing MUSIC
 workspace. The release app uses its bundled backend and a separate ~/Music/LiSTd
 workspace, even when opened on the development Mac. Do not replace one with the other
 while an import is running. Keep only the intended build open.

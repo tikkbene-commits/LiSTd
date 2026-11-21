@@ -309,6 +309,7 @@ def scan(root, state, min_age=30):
                     continue
                 track_id = old['id'] if old else uuid.uuid4().hex[:12]
                 data.update(id=track_id, path=relative, signature=before,
+                            added_at=old.get('added_at', time.time()) if old else time.time(),
                             overrides=old.get('overrides', {}) if old else {})
                 state['tracks'][track_id] = data
                 analyzed += 1
@@ -436,6 +437,7 @@ def sockseek_hook(root, state, path):
     if signature(path) != before:
         raise ValueError('Download is still changing; try sync after it finishes.')
     data.update(id=track_id, path=relative, signature=before,
+                added_at=old.get('added_at', time.time()) if old else time.time(),
                 overrides=old.get('overrides', {}) if old else {})
     state['tracks'][track_id] = data
     save(root, state)

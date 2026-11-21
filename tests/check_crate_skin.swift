@@ -38,6 +38,21 @@ import AppKit
         precondition(greenPixels == 0, "Reference green must become blue")
         let png = boxPixels.representation(using: .png, properties: [:])!
         try! png.write(to: URL(fileURLWithPath: ".music-sorter/build/boombox-preview.png"))
-        print("Silverwave and blue/red boombox render checks passed.")
+        var pitch = 1.0
+        let host = NSHostingView(rootView: VerticalPitchSlider(value: Binding(get: { pitch }, set: { pitch = $0 }), scale: 2)
+            .frame(width: 28, height: 72))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 28, height: 72), styleMask: .borderless,
+                              backing: .buffered, defer: false)
+        window.contentView = host
+        host.layoutSubtreeIfNeeded()
+        func fader(in view: NSView) -> TrackingSlider? {
+            (view as? TrackingSlider) ?? view.subviews.lazy.compactMap { fader(in: $0) }.first
+        }
+        guard let control = fader(in: host) else { fatalError("Native pitch fader is missing") }
+        precondition(control.cell is PitchFaderCell && control.acceptsFirstResponder)
+        precondition(window.makeFirstResponder(control) && window.firstResponder === control)
+        precondition(control.accessibilityPerformIncrement() && abs(pitch - 1.01) < 0.0001)
+        precondition(control.accessibilityPerformDecrement() && abs(pitch - 1) < 0.0001)
+        print("Silverwave/Amped render and native vertical fader focus/accessibility checks passed.")
     }
 }

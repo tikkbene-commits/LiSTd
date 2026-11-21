@@ -2,6 +2,7 @@
 import argparse
 import csv
 import contextlib
+import difflib
 import fcntl
 import io
 import json
@@ -53,7 +54,7 @@ def account_config(credentials):
 def check_login(credentials):
     with account_config(credentials) as config:
         # A print-only search exercises Sockseek's real login without transferring audio.
-        command = ['sockseek', 'LiSTd connection check', '-s', '--config', str(config),
+        command = ['sockseek', 'LiStD connection check', '-s', '--config', str(config),
                    '--print', 'results', '--search-timeout', '1', '--connect-timeout', '15000',
                    '--no-listen', '--verbose', '--no-progress']
         try:
@@ -265,14 +266,20 @@ def probe(path):
 def verify(path, row, minimum):
     data = probe(path)
     tags = data['tags']
-    if tags.get('title') and title_key(tags['title']) != title_key(row['title']):
+    if data['codec'] not in LOSSLESS | {'mp3'} and not data['codec'].startswith('pcm_'):
+        raise ValueError('Audio codec is outside the selected MP3/lossless formats.')
+    if row.get('deep_search'):
+        evidence = deep_identity(str(path), row, tags)
+        if evidence != 'confident':
+            raise ValueError('Deep-search identity needs review: filename/tags do not establish the original artist, title and version.')
+    elif tags.get('title') and title_key(tags['title']) != title_key(row['title']):
         raise ValueError(f'Title tag differs: {tags["title"]}')
-    if tags.get('artist') and normalize(tags['artist']) != normalize(row['artist']):
+    if not row.get('deep_search') and tags.get('artist') and normalize(tags['artist']) != normalize(row['artist']):
         raise ValueError(f'Artist tag differs: {tags["artist"]}')
     name = normalize(path.stem)
-    if not tags.get('title') and not filename_title_matches(path, row):
+    if not row.get('deep_search') and not tags.get('title') and not filename_title_matches(path, row):
         raise ValueError('No matching title tag or filename evidence.')
-    if not tags.get('artist') and normalize(row['artist']) not in name:
+    if not row.get('deep_search') and not tags.get('artist') and normalize(row['artist']) not in name:
         raise ValueError('No matching artist tag or filename evidence.')
     if row.get('length') and abs(data['duration']-row['length']) > 3:
         raise ValueError('Duration differs from the supplied track duration.')
@@ -469,14 +476,15 @@ def run_process(command, log_path, cancel_path, timeout=180):
         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         started = time.monotonic()
         while process.poll() is None:
-            if cancel_path.exists() or time.monotonic()-started > timeout:
+            oversized = log_path.stat().st_size > 8_000_000
+            if cancel_path.exists() or oversized or time.monotonic()-started > timeout:
                 os.killpg(process.pid, signal.SIGTERM)
                 try:
                     process.wait(timeout=4)
                 except subprocess.TimeoutExpired:
                     os.killpg(process.pid, signal.SIGKILL)
                     process.wait()
-                return 'cancelled' if cancel_path.exists() else 'timeout'
+                return 'cancelled' if cancel_path.exists() else 'too many results' if oversized else 'timeout'
             time.sleep(0.25)
         return process.returncode
 
@@ -492,20 +500,181 @@ def candidate_matches(candidate, row):
     return not extras.intersection({'remix', 'mix', 'edit', 'instrumental', 'version', 'dub', 'live', 'radio'})
 
 
-def search_candidates(root, job, index, cancel):
-    log = job_dir(root, job['id'])/f'search-{index}.jsonlog'
-    result = run_process(base_command(root, job, index) + ['--print', 'json-all'], log, cancel, timeout=60)
+# Version words are never discarded by normalization or spelling matching.
+VERSION_WORDS = {'remix', 'mix', 'edit', 'instrumental', 'version', 'dub', 'live', 'radio',
+                 'extended', 'bootleg', 'rework', 'remaster', 'remastered', 'acapella', 'vip', 'vocal'}
+MISSING = {'unavailable', 'stopped'}
+
+
+def release_terms(row):
+    return [normalize(str(value)) for key, value in row.get('original', {}).items()
+            if normalize(key) in {'album', 'release', 'catalog', 'catalogue', 'catalog number', 'catalogue number', 'catno'} and value]
+
+
+def phrase_in(phrase, text):
+    return bool(phrase) and f' {phrase} ' in f' {text} '
+
+
+def deep_identity(filename, row, tags=None):
+    """Broader placement is OK; fuzzy spelling and unexplained words require review."""
+    tags = tags or {}
+    leaf = filename.replace('\\', '/').rsplit('/', 1)[-1].rsplit('.', 1)[0]
+    title, artist = title_key(row['title']), normalize(row['artist'])
+    leaf_key = title_key(leaf)
+    title_tag, artist_tag = title_key(tags.get('title', '')), normalize(tags.get('artist', ''))
+    evidence = ' '.join([title_key(filename), title_tag, artist_tag])
+    # A version word absent from the requested title cannot be excused by album evidence.
+    requested_versions = set(title.split()) & VERSION_WORDS
+    for source in (leaf_key, title_tag):
+        without_artist = (' ' + source + ' ').replace(' ' + artist + ' ', ' ', 1)
+        extras = (set(without_artist.split()) & VERSION_WORDS) - requested_versions
+        if extras:
+            return 'reject'
+    title_sources = [leaf_key, title_tag, artist_tag]
+    exact_title = any(phrase_in(title, source) for source in title_sources)
+    exact_artist = phrase_in(artist, evidence)
+    allowed = set((title + ' ' + artist + ' ' + ' '.join(release_terms(row))).split())
+    def unexplained(source):
+        return {word for word in source.split() if not word.isdigit()} - allowed
+    # Conflicting tags stay uncertain even when a peer filename looks exact.
+    if exact_title and exact_artist and not any(unexplained(source) for source in (leaf_key, title_tag, artist_tag)):
+        return 'confident'
+    def similar_phrase(expected, source):
+        words, actual = expected.split(), source.split()
+        if not words:
+            return False
+        for offset in range(max(0, len(actual) - len(words) + 1)):
+            differences = 0
+            for wanted, found in zip(words, actual[offset:offset+len(words)]):
+                if wanted == found:
+                    continue
+                if (wanted in VERSION_WORDS or found in VERSION_WORDS or min(len(wanted), len(found)) < 5
+                        or abs(len(wanted)-len(found)) > 1
+                        or difflib.SequenceMatcher(None, wanted, found).ratio() < 0.88):
+                    break
+                differences += 1
+            else:
+                if differences <= 1:
+                    return True
+        return False
+    if ((exact_title or any(similar_phrase(title, source) for source in title_sources))
+            and (exact_artist or similar_phrase(artist, evidence))):
+        return 'review'
+    return 'reject'
+
+
+def deep_queries(row):
+    artist, title = normalize(row['artist']), normalize(row['title'])
+    queries = [artist + ' ' + title, title + ' ' + artist, title]
+    for release in release_terms(row):
+        queries.extend([title + ' ' + release, artist + ' ' + release])
+    # One omitted long word can retrieve a one-character misspelling; identity still needs review.
+    words = (artist + ' ' + title).split()
+    if len(words) >= 3:
+        longest = max(range(len(words)), key=lambda i: len(words[i]))
+        queries.append(' '.join(words[:longest] + words[longest+1:]))
+    return list(dict.fromkeys(q for q in queries if q.strip()))[:6]
+
+
+def deep_search_candidates(root, job, index, cancel):
+    row, folder = job['tracks'][index], job_dir(root, job['id'])
+    found, uncertain, seen = [], [], set()
+    queries = deep_queries(row)
+    row['candidates'], row['candidate_results'] = [], []
+    for number, query in enumerate(queries):
+        if cancel.exists():
+            break
+        row.update(status='searching', note=f'Deep search {number+1}/{len(queries)} · {query}')
+        job['message'] = f'{index+1}/{len(job["tracks"])} · {row["artist"]} — {row["title"]} · {row["note"]}'
+        save_job(root, job)
+        search_file = folder/f'deep-{index}.csv'
+        with search_file.open('w', newline='', encoding='utf-8') as handle:
+            writer = csv.writer(handle)
+            writer.writerow(['Artist', 'Title', 'Length'])
+            writer.writerow(['', query, row.get('length') or ''])
+        command = base_command(root, job, index)
+        command[1] = str(search_file)
+        for option, value in [('--offset', '0'), ('--artist-col', 'Artist'), ('--title-col', 'Title')]:
+            command[command.index(option)+1] = value
+        for option in ('--length-col', '--time-format'):
+            if option in command:
+                position = command.index(option)
+                del command[position:position+2]
+        command += ['--length-col', 'Length', '--time-format', 's', '--strict-title', 'false',
+                    '--strict-artist', 'false', '--no-write-index', '--print', 'json-all']
+        log = folder/f'deep-{index}-{number}.jsonlog'
+        result = run_process(command, log, cancel, timeout=45)
+        if cancel.exists():
+            break
+        data = read_candidates(log, result)
+        for candidate in data[:200]:
+            filename = candidate.get('File', {}).get('Filename', '')
+            username = candidate.get('User', {}).get('Username', '')
+            key = (username, filename)
+            if not filename or not username or key in seen:
+                continue
+            seen.add(key)
+            length = candidate['File'].get('Length')
+            if (row.get('length') and isinstance(length, (int, float)) and math.isfinite(length)
+                    and length > 0 and abs(length - row['length']) > 3):
+                continue
+            identity = deep_identity(filename, row)
+            if identity == 'confident':
+                found.append(candidate)
+            elif identity == 'review' and len(uncertain) < 20:
+                uncertain.append(candidate)
+        if len(found) >= 3:
+            break
+    row['candidate_results'] = uncertain
+    row['candidates'] = [dict(number=i, filename=c['File']['Filename'], username=c['User']['Username'],
+                              reason='Spelling, extra words or metadata placement need confirmation')
+                         for i, c in enumerate(uncertain)]
+    return found[:3]
+
+
+def retry_rows(job, deep=False, index=None, candidate=None):
+    if not deep:
+        if index is not None or candidate is not None:
+            raise ValueError('Track/candidate selection requires Deep search.')
+        return job['tracks']
+    rows = job['tracks']
+    if index is not None:
+        if not 0 <= index < len(rows):
+            raise ValueError('Invalid track index.')
+        rows = [rows[index]]
+    elif candidate is not None:
+        raise ValueError('Select an individual track before choosing a candidate.')
+    rows = [r for r in rows if not (r.get('path') and Path(r['path']).is_file()) and
+            (r['status'] in MISSING or (r['status'] == 'review' and not r.get('path') and r.get('candidates')))]
+    if candidate is not None:
+        if not rows or not 0 <= candidate < len(rows[0].get('candidate_results', [])):
+            raise ValueError('Candidate no longer available. Deep search again.')
+    if not rows:
+        raise ValueError('No missing tracks to deep search. Accepted and staged review files are preserved.')
+    return rows
+
+
+def read_candidates(log, result):
+    if log.stat().st_size > 8_000_000:
+        raise ValueError('Search returned too many results. Try a more specific title or release.')
     text = log.read_text(errors='replace')
     for line in text.splitlines():
         if line.startswith('[{') or line == '[]':
             data = json.loads(line)
-            return [c for c in data if candidate_matches(c, job['tracks'][index])]
-    if 'exception' in text.casefold() or 'error' in text.casefold() or result != 0:
+            if isinstance(data, list):
+                return data
+    if 'exception' in text.casefold() or 'error' in text.casefold() or result not in (0, 1):
         raise ValueError('The Soulseek connection failed. Retry when the network settles.')
     return []
 
 
-def run_job(root, job_id, credentials=None):
+def search_candidates(root, job, index, cancel):
+    log = job_dir(root, job['id'])/f'search-{index}.jsonlog'
+    result = run_process(base_command(root, job, index) + ['--print', 'json-all'], log, cancel, timeout=60)
+    return [c for c in read_candidates(log, result) if candidate_matches(c, job['tracks'][index])]
+
+
+def run_job(root, job_id, credentials=None, deep=False, index=None, candidate=None):
     folder = job_dir(root, job_id)
     with (root/'.music-sorter/crate/download.lock').open('a') as lock, contextlib.ExitStack() as stack:
         try:
@@ -513,6 +682,8 @@ def run_job(root, job_id, credentials=None):
         except BlockingIOError:
             raise ValueError('Another import is downloading. Wait for it or stop it first.')
         job = load_job(root, job_id)
+        rows = retry_rows(job, deep, index, candidate)
+        selected_candidate = rows[0]['candidate_results'][candidate] if candidate is not None else None
         if not shutil.which('sockseek') or not shutil.which('ffmpeg') or not shutil.which('ffprobe'):
             raise ValueError('Sockseek and FFmpeg must be installed.')
         config = stack.enter_context(account_config(credentials))
@@ -521,7 +692,7 @@ def run_job(root, job_id, credentials=None):
         cancel.unlink(missing_ok=True)
         job.update(status='running', message='Searching Soulseek', pid=os.getpid())
         save_job(root, job)
-        for row in job['tracks']:
+        for row in rows:
             if cancel.exists():
                 break
             if row['status'] in ('ready', 'existing') and Path(row['path']).is_file():
@@ -532,11 +703,13 @@ def run_job(root, job_id, credentials=None):
                 save_job(root, job)
                 continue
             index = row['index']
-            row.update(status='searching', note='Searching for an exact match')
+            if not deep:
+                row.update(candidates=[], candidate_results=[])
+            row.update(status='searching', note='Searching for an exact match', deep_search=deep)
             job['message'] = f'{index+1} of {len(job["tracks"])} · {row["artist"]} — {row["title"]}'
             save_job(root, job)
             try:
-                candidates = search_candidates(root, job, index, cancel)
+                candidates = ([selected_candidate] if selected_candidate else deep_search_candidates(root, job, index, cancel)) if deep else search_candidates(root, job, index, cancel)
             except ValueError as error:
                 row.update(status='unavailable', note=str(error))
                 save_job(root, job)
@@ -546,7 +719,7 @@ def run_job(root, job_id, credentials=None):
                 save_job(root, job)
                 break
             if not candidates:
-                row.update(status='unavailable', note='No exact original-version match at this quality. Retry to search again.')
+                row.update(status='review' if row.get('candidates') else 'unavailable', note='Deep search found candidates needing review.' if row.get('candidates') else 'No exact original-version match at this quality. Try Deep search or supply release information.')
                 save_job(root, job)
                 continue
             row.update(status='downloading', note='Downloading an exact candidate')
@@ -568,6 +741,7 @@ def run_job(root, job_id, credentials=None):
                 if hook_result.exists():
                     row.update(json.loads(hook_result.read_text()))
                     if row['status'] == 'ready':
+                        row.update(candidates=[], candidate_results=[])
                         break
                 if result == 'cancelled':
                     row.update(status='stopped', note='Stopped')
@@ -602,7 +776,19 @@ def snapshot(root):
     for track in data['tracks'].values():
         if (root/track['path']).is_file():
             genre, vibe = sorter.labels(track)
-            library.append(dict(track, genre=genre, vibe=vibe, path=str(root/track['path'])))
+            audio = root/track['path']
+            membership = [job for job in jobs if any(
+                row.get('track_id') == track['id'] or row.get('path') == str(audio)
+                for row in job['tracks'])]
+            parent = audio.parent
+            download_folder = str(parent.relative_to(root/'downloads')) if parent.is_relative_to(root/'downloads') else 'Outside downloads'
+            if download_folder == '.':
+                download_folder = 'Downloads root'
+            stat = audio.stat()
+            # Old catalogs have no insertion time; import records, then file birth time are read-only fallbacks.
+            added = track.get('added_at') or min((job['created'] for job in membership), default=getattr(stat, 'st_birthtime', stat.st_mtime))
+            library.append(dict(track, genre=genre, vibe=vibe, path=str(audio),
+                                download_folder=download_folder, imports=[f'{job["name"]} · {job["id"][:6]}' for job in membership], added_at=added))
     current = {t['id']: t for t in library}
     for job in jobs:
         for row in job['tracks']:
@@ -696,6 +882,10 @@ def main(argv=None):
     for name in ('run', 'stop'):
         cmd = sub.add_parser(name)
         cmd.add_argument('id')
+        if name == 'run':
+            cmd.add_argument('--deep', action='store_true')
+            cmd.add_argument('--index', type=int)
+            cmd.add_argument('--candidate', type=int)
     cmd = sub.add_parser('swap-order')
     cmd.add_argument('id')
     for name in ('review-info', 'review-track'):
@@ -730,7 +920,7 @@ def main(argv=None):
             result = create_job(root, text, args.name, args.order, args.minimum)
         elif args.command == 'run':
             credentials = sys.stdin.read() if not sys.stdin.isatty() else ''
-            result = run_job(root, args.id, json.loads(credentials) if credentials.strip() else None)
+            result = run_job(root, args.id, json.loads(credentials) if credentials.strip() else None, args.deep, args.index, args.candidate)
         elif args.command == 'swap-order':
             result = correct_import(root, args.id)
         elif args.command == 'review-track':

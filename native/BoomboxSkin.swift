@@ -20,7 +20,7 @@ struct VerticalPitchSlider: NSViewRepresentable {
     var scale: CGFloat = 1
     func makeCoordinator() -> Coordinator { Coordinator(value: $value) }
     func makeNSView(context: Context) -> NSSlider {
-        let slider = NSSlider(frame: NSRect(x: 0, y: 0, width: 14 * scale, height: 36 * scale))
+        let slider = TrackingSlider(frame: NSRect(x: 0, y: 0, width: 14 * scale, height: 36 * scale))
         slider.cell = PitchFaderCell()
         slider.minValue = 0.5
         slider.maxValue = 1.5
@@ -162,8 +162,8 @@ struct BoomboxArtwork: View {
             paint(Path(roundedRect: CGRect(x: 105, y: 31, width: 148, height: 32), cornerRadius: 12), [Color(white: 0.35), .black, .black], CGPoint(x: 0, y: 31), CGPoint(x: 0, y: 63), width: 2)
             let shine = Path(roundedRect: CGRect(x: 111, y: 35, width: 135, height: 13), cornerRadius: 7)
             context.fill(shine, with: .linearGradient(Gradient(colors: [.white.opacity(0.25), .white.opacity(0.01)]), startPoint: CGPoint(x: 0, y: 35), endPoint: CGPoint(x: 0, y: 48)))
-            context.draw(Text("LiSTd").font(.custom("Arial Black", size: 25)).italic().foregroundColor(.white), at: CGPoint(x: 180, y: 80))
-            context.draw(Text("LiSTd").font(.custom("Arial Black", size: 23)).italic().foregroundColor(Self.red), at: CGPoint(x: 180, y: 79))
+            context.draw(Text("LiStD").font(.custom("Arial Black", size: 25)).italic().foregroundColor(.white), at: CGPoint(x: 180, y: 80))
+            context.draw(Text("LiStD").font(.custom("Arial Black", size: 23)).italic().foregroundColor(Self.red), at: CGPoint(x: 180, y: 79))
             context.draw(Text("P I T C H   C O N T R O L").font(.system(size: 4, weight: .heavy)).foregroundColor(.white), at: CGPoint(x: 179, y: 96))
         }.accessibilityHidden(true)
     }
@@ -201,8 +201,8 @@ struct BoomboxPlayer: View {
                     .help("Click the shell to play or pause")
                 ZStack {
                 hit("Mute / unmute", width: 19, height: 10) { player.toggleMute() }.position(x: 156.5, y: 20)
-                hit("Minimize LiSTd", width: 19, height: 10) { playerWindow?.miniaturize(nil) }.position(x: 180.5, y: 20)
-                hit("Close LiSTd", width: 19, height: 10) { playerWindow?.performClose(nil) }.position(x: 204.5, y: 20)
+                hit("Minimize LiStD", width: 19, height: 10) { playerWindow?.miniaturize(nil) }.position(x: 180.5, y: 20)
+                hit("Close LiStD", width: 19, height: 10) { playerWindow?.performClose(nil) }.position(x: 204.5, y: 20)
                 hit("Volume down", width: 18, height: 29) { player.volume = max(0, player.volume - 0.05) }.position(x: 83, y: 59.5)
                 hit("Volume up", width: 18, height: 29) { player.volume = min(1, player.volume + 0.05) }.position(x: 275, y: 59.5)
                 hit("Back 10 seconds · left speaker", width: 100, height: 100) { player.seek(to: player.position - 10) }.position(x: 70, y: 144)

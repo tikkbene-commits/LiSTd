@@ -59,13 +59,13 @@ def main():
     # Desktop sync can restore FinderInfo while signing; seal outside the synced tree.
     staging = Path(tempfile.mkdtemp(prefix='listd-release-'))
     atexit.register(shutil.rmtree, staging, ignore_errors=True)
-    payload = staging/'LiSTd'
+    payload = staging/'LiStD'
     payload.mkdir()
     shutil.copy2(ROOT/'native/Assets/ReadMe.txt', payload/'READ ME FIRST.txt')
-    app = payload/'LiSTd.app'
+    app = payload/'LiStD.app'
     (app/'Contents/MacOS').mkdir(parents=True)
-    shutil.copy2(ROOT/'LiSTd.app/Contents/MacOS/LiSTd', app/'Contents/MacOS/LiSTd')
-    shutil.copy2(ROOT/'LiSTd.app/Contents/Info.plist', app/'Contents/Info.plist')
+    shutil.copy2(ROOT/'LiStD.app/Contents/MacOS/LiStD', app/'Contents/MacOS/LiStD')
+    shutil.copy2(ROOT/'LiStD.app/Contents/Info.plist', app/'Contents/Info.plist')
     plist_path = app/'Contents/Info.plist'
     plist = plistlib.loads(plist_path.read_bytes())
     plist['LiSTdStandalone'] = True
@@ -73,7 +73,7 @@ def main():
     resources = app/'Contents/Resources'
     resources.mkdir()
     for icon in ('EarIcon.icns', 'Crate.icns', 'CrateSilverwave.icns'):
-        shutil.copy2(ROOT/'LiSTd.app/Contents/Resources'/icon, resources/icon)
+        shutil.copy2(ROOT/'LiStD.app/Contents/Resources'/icon, resources/icon)
     backend = resources/'backend'
     for architecture in ARCHITECTURES:
         prefix = ['/usr/bin/arch', '-'+architecture]
@@ -155,7 +155,7 @@ def main():
                 run('/usr/bin/codesign', '--force', '--sign', identity, *signing, path)
     run('/usr/bin/codesign', '--force', '--deep', '--sign', identity, *signing, app)
     run('/usr/bin/codesign', '--verify', '--deep', '--strict', app)
-    zip_path = staging/'LiSTd-Mac.zip'
+    zip_path = staging/'LiStD-Mac.zip'
     run('/usr/bin/ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', payload, zip_path)
     if profile:
         result = subprocess.check_output(['/usr/bin/xcrun', 'notarytool', 'submit', str(zip_path),

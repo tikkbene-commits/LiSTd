@@ -2,10 +2,10 @@
 
 ## Start here in a new chat
 
-- This folder contains the **LiSTd** macOS app (formerly Crate) and the existing music collection. Before editing the app, read `APP_CONTEXT.md`, the recent entries in `CHANGELOG.md`, and the relevant sections of `CRATE.md` / `MUSIC_SORTER.md`. These files are the project handoff; do not assume a new chat has the old conversation.
+- This folder contains the **LiStD** macOS app (formerly Crate) and the existing music collection. Before editing the app, read `APP_CONTEXT.md`, the recent entries in `CHANGELOG.md`, and the relevant sections of `CRATE.md` / `MUSIC_SORTER.md`. These files are the project handoff; do not assume a new chat has the old conversation.
 - Inspect the current source before changing it. The live code and saved state take precedence over dated handoff snapshots. Preserve unrelated work, including the Silverwave and Original skins.
 - After each app change, update `APP_CONTEXT.md` when behavior, architecture, preferences, setup or known limitations change, and append a dated entry to `CHANGELOG.md` describing the change and its validation. Record checks that were skipped or failed honestly. Do not place secrets, credentials or full chat transcripts in these notes.
-- Edit source files, not generated files inside `LiSTd.app`. Rebuild after Swift/icon changes and restart the app to load the new binary. Documentation-only changes need no build, audio scan or download. App maintenance alone never authorizes a new live download.
+- Edit source files, not generated files inside `LiStD.app`. Rebuild after Swift/icon changes and restart the app to load the new binary. Documentation-only changes need no build, audio scan or download. App maintenance alone never authorizes a new live download.
 
 ## Soulseek downloads
 
@@ -32,9 +32,9 @@
 - Do not change Sockseek credentials/configuration or start downloads to test the hook. Do not start a persistent watcher unless asked; `./music-sorter watch --apply` runs in the foreground until Ctrl-C. Avoid running watch and the completion hook simultaneously.
 - The organizer excludes `delete_review`, `.incomplete` files, hidden folders and symlinks. It never touches `juan music`. `./music-sorter list` supports genre, vibe and BPM filters for set selection. Use `label TRACK_ID --genre ... --vibe ...` for corrections and `undo` / `undo --apply` for reversal.
 
-## LiSTd graphical app
+## LiStD graphical app
 
-- `LiSTd.app` is the native macOS front end; source is `native/Crate.swift`, backend is `crate_backend.py`, and usage is in `CRATE.md`. Run `./build-crate` to rebuild it. Keep the app in this folder. The app/backend use `.music-sorter/audio-env/bin/python` for local librosa tempo analysis; use that interpreter for the complete test suite.
+- `LiStD.app` is the native macOS front end; source is `native/Crate.swift`, backend is `crate_backend.py`, and usage is in `CRATE.md`. Run `./build-crate` to rebuild it. Keep the app in this folder. The app/backend use `.music-sorter/audio-env/bin/python` for local librosa tempo analysis; use that interpreter for the complete test suite.
 - A user importing/dropping a tracklist with automatic downloads enabled requests downloads. Respect the import's selected quality (initially 320 kbps or lossless). Preserve CSV fields; text timestamps and SetStart are mix cue positions, not full-track durations. Text order is explicit; the supplied example is Title - Artist.
 - Crate owns one loopback-only Sockseek daemon for the duration of an import and still searches CSV rows individually. Its custom completion hook verifies codec, packet-measured bitrate, supplied duration and title/artist evidence before calling the organizer and updating Sockseek's index path. Do not add a second organizer hook or watcher to Crate's commands.
 - Only accepted files move from `downloads/.incoming/<import-id>/` into organized folders. Failed or uncertain files stay in staging and are shown as review/unavailable; never count them as successful songs. Do not relax quality or substitute alternate mixes silently. Existing qualifying tracks are reused; `juan music` is never moved.

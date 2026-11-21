@@ -1,7 +1,7 @@
 # Music Sorter
 
 A local command-line tool for this MUSIC folder. For the graphical window with
-integrated downloads, open **LiSTd.app**; see [CRATE.md](CRATE.md).
+integrated downloads, open **LiStD.app**; see [CRATE.md](CRATE.md).
 It reads finished Sockseek downloads,
 uses genre tags, estimates a DJ-oriented vibe, and **moves** each track to one folder.
 It never makes audio copies, rewrites tags, or downloads music.

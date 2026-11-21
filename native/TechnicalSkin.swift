@@ -17,26 +17,29 @@ struct TechnicalPlayer: View {
         VStack(spacing: 0) {
             VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("LiSTd").font(.system(size: 22, weight: .semibold, design: .rounded))
+                Text("LiStD").font(.system(size: 22, weight: .semibold, design: .rounded))
                 Text("/  SIGNAL").tracking(3).foregroundStyle(Self.dim)
-                Spacer()
+            }
+            HStack(spacing: 12) {
                 Text("VIEW").foregroundStyle(Self.dim)
-                Slider(value: $waveformSeconds, in: 12...120, step: 12).frame(width: 85)
+                StableSlider(value: $waveformSeconds, in: 12...120, step: 12).frame(minWidth: 60, maxWidth: 180)
                     .accessibilityLabel("Waveform time window").help("Show more of each track; smaller values zoom into beats")
                 Text("\(Int(waveformSeconds))s").monospacedDigit().frame(width: 34)
             }
-            HStack(spacing: 12) {
-                Text("A / MASTER").tracking(2).foregroundStyle(Self.dim)
-                Spacer()
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 8)], spacing: 8) {
+                Text("ONE-TIME SYNC").tracking(2).foregroundStyle(Self.dim)
                 Button("Pause both") { if a.isPlaying { a.toggle() }; if b.isPlaying { b.toggle() } }
                     .disabled(!a.isPlaying && !b.isPlaying)
                 Button("Play both") {
                     let time = mach_absolute_time() + AVAudioTime.hostTime(forSeconds: 0.15)
                     a.start(atHostTime: time); b.start(atHostTime: time)
                 }.disabled(!a.loaded || !b.loaded)
-                Button("Sync B → A") { b.sync(to: a) }
+                Button("Sync A to B") { a.sync(to: b) }
                     .disabled(!a.canSync || !b.canSync)
-                    .help("Match B to A’s tempo and beat phase. Set a beat cue in both decks first, or analyze beats.")
+                    .help("Change A to match B’s effective tempo and beat phase. B remains unchanged. This is one-time alignment.")
+                Button("Sync B to A") { b.sync(to: a) }
+                    .disabled(!a.canSync || !b.canSync)
+                    .help("Change B to match A’s effective tempo and beat phase. A remains unchanged. Set beat cues or analyze first; this is one-time alignment.")
             }.padding(.top, 10)
             }.padding(.horizontal, 24).padding(.vertical, 17)
             Rectangle().fill(Self.line).frame(height: 1)
@@ -44,11 +47,10 @@ struct TechnicalPlayer: View {
             Rectangle().fill(Self.line).frame(height: 1)
             SignalDeck(player: b, name: "B", waveformSeconds: waveformSeconds, analyze: { analyze(b) })
             Rectangle().fill(Self.line).frame(height: 1)
-            HStack(spacing: 28) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 20)], spacing: 20) {
                 SignalEQ(player: a, name: "A")
-                Rectangle().fill(Self.line).frame(width: 1)
                 SignalEQ(player: b, name: "B")
-            }.padding(.horizontal, 24).padding(.vertical, 20).frame(height: 155)
+            }.padding(.horizontal, 24).padding(.vertical, 20)
         }
         .font(.system(size: 11, design: .monospaced))
         .buttonStyle(.bordered).controlSize(.small)
@@ -67,7 +69,7 @@ private struct SignalDeck: View {
 
     var body: some View {
         VStack(spacing: 9) {
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 Text(name).font(.system(size: 24, weight: .light, design: .monospaced)).foregroundStyle(TechnicalPlayer.green)
                     .frame(width: 28)
                 VStack(alignment: .leading, spacing: 3) {
@@ -77,10 +79,8 @@ private struct SignalDeck: View {
                         .font(.system(size: 10)).foregroundStyle(TechnicalPlayer.dim).lineLimit(1)
                 }
                 Spacer()
-                Text(player.isPlaying ? "PLAYING" : player.loaded ? "READY" : "EMPTY")
-                    .font(.system(size: 9)).tracking(1.2).foregroundStyle(player.isPlaying ? TechnicalPlayer.green : TechnicalPlayer.dim)
                 Text("\(CratePlayer.clock(player.position)) / \(CratePlayer.clock(player.duration))")
-                    .monospacedDigit().frame(width: 115, alignment: .trailing)
+                    .monospacedDigit().frame(width: 100, alignment: .trailing)
                 Button("Open file") { player.openFile(autoplay: false) }.help("Load a local file into deck \(name)")
             }
             VStack(spacing: 5) {
@@ -105,7 +105,7 @@ private struct SignalDeck: View {
                 }
                 return true
             }
-            HStack(spacing: 8) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 8)], spacing: 8) {
                 Button { player.toggle() } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").frame(width: 24)
                 }.tint(TechnicalPlayer.green).disabled(!player.loaded)
@@ -118,7 +118,7 @@ private struct SignalDeck: View {
                 Button("+20 ms") { player.seek(to: player.position + 0.02) }.disabled(!player.loaded).help("Nudge deck \(name) forward")
                 Spacer()
             }
-            HStack(spacing: 8) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 8)], spacing: 8) {
                 Text("BPM").foregroundStyle(TechnicalPlayer.dim)
                 TextField("BPM", value: Binding(get: { player.bpm }, set: { player.bpm = $0; player.bpmIsEstimate = false }), format: .number.precision(.fractionLength(2)))
                     .textFieldStyle(.roundedBorder).frame(width: 58)
@@ -139,9 +139,8 @@ private struct SignalDeck: View {
                         if (40...250).contains(value) { player.bpm = (value * 100).rounded() / 100; player.bpmIsEstimate = false }
                     }
                 }.help("Tap the beat to set the original BPM")
-                Spacer(minLength: 0)
                 Text(String(format: "→ %.2f", player.effectiveBPM)).foregroundStyle(TechnicalPlayer.green).frame(width: 72)
-                Slider(value: $player.rate, in: 0.5...1.5, step: 0.001).frame(width: 90)
+                StableSlider(value: $player.rate, in: 0.5...1.5, step: 0.001).frame(minWidth: 65)
                     .accessibilityLabel("Deck \(name) tempo and pitch")
                 Button(String(format: "%+.1f%%", (player.rate - 1) * 100)) { player.rate = 1 }
                     .frame(width: 62).help("Reset speed to 1×; pitch follows speed")
@@ -267,7 +266,7 @@ private struct SignalEQ: View {
                 band("HIGH", value: $player.high)
                 VStack(spacing: 5) {
                     Text("LEVEL").font(.system(size: 9)).foregroundStyle(TechnicalPlayer.dim)
-                    Slider(value: $player.volume, in: 0...1).accessibilityLabel("Deck \(name) level")
+                    StableSlider(value: $player.volume, in: 0...1).accessibilityLabel("Deck \(name) level")
                     Text(String(format: "%.0f%%", player.volume * 100)).font(.system(size: 9))
                 }
             }
@@ -276,7 +275,7 @@ private struct SignalEQ: View {
     func band(_ label: String, value: Binding<Double>) -> some View {
         VStack(spacing: 5) {
             Text(label).font(.system(size: 9)).foregroundStyle(TechnicalPlayer.dim)
-            Slider(value: value, in: -24...0, step: 0.5).accessibilityLabel("Deck \(name) \(label.lowercased()) EQ")
+            StableSlider(value: value, in: -24...0, step: 0.5).accessibilityLabel("Deck \(name) \(label.lowercased()) EQ")
             Text(String(format: "%.1f dB", value.wrappedValue)).font(.system(size: 9))
         }
     }

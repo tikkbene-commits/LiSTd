@@ -143,7 +143,7 @@ def main():
     audit(app)
     with tempfile.TemporaryDirectory(prefix='listd-standalone-') as directory:
         folder = Path(directory).resolve()
-        moved = folder/'Moved app with spaces – LiSTd.app'
+        moved = folder/'Moved app with spaces – LiStD.app'
         shutil.copytree(app, moved, symlinks=True)
         for architecture in ARCHITECTURES:
             exercise(moved, architecture, folder, app)

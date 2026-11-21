@@ -3,7 +3,7 @@ import SwiftUI
 enum CrateSkin: String, CaseIterable, Identifiable {
     case boombox, silverwave, classic, technical
     var id: String { rawValue }
-    var title: String { self == .technical ? "Signal · Dual Deck" : self == .boombox ? "Amped · Blue / Red" : self == .silverwave ? "Silverwave" : "LiSTd · Original" }
+    var title: String { self == .technical ? "Signal · Dual Deck" : self == .boombox ? "Amped · Blue / Red" : self == .silverwave ? "Silverwave" : "LiStD · Original" }
     var icon: String { self == .silverwave ? "CrateSilverwave" : "Crate" }
     var accent: Color { self == .technical ? Color(red: 0.34, green: 0.84, blue: 0.53) : self == .boombox ? Color(red: 0.84, green: 0.025, blue: 0.055) : self == .silverwave ? Color(red: 0.39, green: 0.25, blue: 0.66) : .blue }
 
@@ -59,7 +59,7 @@ struct SilverwaveDisplay: View {
         HStack(spacing: 22) {
             CrateEmblem().frame(width: 80, height: 80).padding(.leading, 10)
             VStack(alignment: .leading, spacing: 8) {
-                Text("LiSTd  /  SILVERWAVE").font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(3).foregroundStyle(Color(red: 0.75, green: 0.66, blue: 0.91))
+                Text("LiStD  /  SILVERWAVE").font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(3).foregroundStyle(Color(red: 0.75, green: 0.66, blue: 0.91))
                 Text(title).font(.custom("Trebuchet MS Bold", size: 23)).foregroundStyle(.white).lineLimit(1)
                 Text(subtitle).font(.system(size: 11, design: .monospaced)).foregroundStyle(Color(red: 0.78, green: 0.83, blue: 0.91)).lineLimit(1)
             }
