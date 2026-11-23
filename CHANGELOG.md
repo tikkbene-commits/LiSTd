@@ -5,6 +5,27 @@ decisions, validation performed and any checks skipped. Keep this history factua
 the initial entries below summarize retained source, local records and this session,
 rather than reconstruct every past chat message.
 
+## 2026-11-23 — Backend review: label fix and small optimisations
+
+- Reviewed `crate_backend.py` for optimisation. Measured on the real library (156
+  catalog tracks): snapshot ≈0.08 s; verifying one MP3 ≈0.9 s (probe 0.24 s, packet
+  bitrate 0.12 s, full test decode 0.5 s). Soulseek search/transfer time dominates;
+  no large backend bottleneck was found.
+- Fix: the genre/vibe label command saved jobs taken from `snapshot()`, whose
+  display-only statuses (e.g. "File moved or missing" → review) could be written
+  back to disk and cause needless re-searches. It now edits the stored jobs.
+- Bitrate measurement reads ffprobe packets in compact text instead of JSON
+  (output 1.26 MB → 0.46 MB for one track; time unchanged at ≈0.1 s). Unknown
+  `N/A` values are skipped.
+- An import run lists `juan music` audio once instead of once per row. The catalog
+  is still re-read per row so tracks organized earlier in the same run count as
+  existing.
+- Validation: three new regression tests (label status preserved — fails on the old
+  code; supplied library listing; 192 kbps MP3 measured within 8 kbps). Full suite
+  with `.music-sorter/audio-env/bin/python`: 40 passed. One baseline run before the
+  change had a single failure that did not reproduce in two reruns (flaky; not
+  investigated). No Swift change, so no rebuild; app not relaunched.
+
 ## 2026-11-21 — Cyber · Lilac end-to-end testing
 
 - Ran the real `CrateView` (real model, backend snapshot and fixture collection)
