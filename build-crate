@@ -7,7 +7,7 @@ if [[ ! -x '.music-sorter/audio-env/bin/python' ]]; then
 fi
 mkdir -p 'LiStD.app/Contents/MacOS' 'LiStD.app/Contents/Resources' '.music-sorter/build'
 for architecture in arm64 x86_64; do
-  swiftc -swift-version 5 -O -parse-as-library -target "$architecture-apple-macosx14.0" native/Crate.swift native/Collection.swift native/SoulseekAccount.swift native/CrateSkin.swift native/CratePlayer.swift native/BoomboxSkin.swift native/AudioSpectrum.swift native/TechnicalSkin.swift -o ".music-sorter/build/LiStD.$architecture"
+  swiftc -swift-version 5 -O -parse-as-library -target "$architecture-apple-macosx14.0" native/Crate.swift native/Collection.swift native/SoulseekAccount.swift native/CrateSkin.swift native/CratePlayer.swift native/BoomboxSkin.swift native/AudioSpectrum.swift native/TechnicalSkin.swift native/CyberSkin.swift -o ".music-sorter/build/LiStD.$architecture"
 done
 lipo -create '.music-sorter/build/LiStD.arm64' '.music-sorter/build/LiStD.x86_64' -output '.music-sorter/build/LiStD'
 mv '.music-sorter/build/LiStD' 'LiStD.app/Contents/MacOS/LiStD'

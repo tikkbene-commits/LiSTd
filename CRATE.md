@@ -27,7 +27,7 @@ Close other Soulseek clients using that account before signing in or importing.
 ## Skins
 
 Use the **Skin** menu in the toolbar to switch between **Amped · Blue / Red**,
-**Silverwave**, **LiStD · Original**, and **Signal · Dual Deck**. Amped recreates the supplied boombox reference:
+**Silverwave**, **LiStD · Original**, **Signal · Dual Deck** and **Cyber · Lilac**. Amped recreates the supplied boombox reference:
 blue shell, red lettering, chrome controls and black speaker grilles. It is the initial
 skin for new preferences; your choice is saved. Skin changes preserve playback and
 imports. All skins use your supplied ear icon in Finder and the Dock. The speaker
@@ -58,6 +58,25 @@ The top switches mute, minimize and close the window. The side controls lower/ra
 volume. Clicking the left/right speaker seeks backward/forward 10 seconds; the vents
 lower/raise pitch by 1%. Clicking the shell plays/pauses, or opens audio when empty.
 Every control has a tooltip and an accessibility label.
+
+### Cyber · Lilac
+
+Cyber recreates the supplied lilac media-player design. The black screen shows the
+live spectrum with the title, artist and play status; the eye button beside it turns
+the spectrum on or off, and the small ◀ ▶ arrows lower/raise speed by 1%. Click the
+tri-colour mark to reset speed. Drag the bronze knob under the screen to seek. Drag the
+ball along the pink ring to set volume; click **+** or **–** to step it by 5%, or the
+speaker mark to mute. The title field scrolls long names; click the time field to switch
+between elapsed and remaining time. The document button opens **Tracks & imports**, the
+folder button opens an audio file, and _ / X minimize or close the window.
+
+On the transport ring, |◀◀ and ▶▶| load the previous or next track from the
+collection pane, in its current view, filter and sort, and stop at the ends. Previous
+restarts the song once it has played for more than 3 seconds. A playing track keeps
+playing when you step; a paused one loads paused. ◀◀ / ▶▶ jump 10 seconds, ‖ pauses,
+■ stops, and ▶ plays. With nothing loaded, ▶ starts the first track in the collection
+view, or asks for a file when the view is empty. The ball and seek knob also respond
+to the arrow keys when focused.
 
 During playback, real audio-frequency bars appear behind the title, in green, yellow
 and red with a faint reflection like the supplied reference. Click the display to hide
@@ -278,8 +297,10 @@ Run deterministic checks without making real downloads:
 Check the native skin/logo render after visual changes:
 
 ```sh
-swiftc -parse-as-library native/CrateSkin.swift native/CratePlayer.swift native/BoomboxSkin.swift native/AudioSpectrum.swift tests/check_crate_skin.swift -o .music-sorter/build/check-skin
+swiftc -parse-as-library native/CrateSkin.swift native/CratePlayer.swift native/BoomboxSkin.swift native/AudioSpectrum.swift native/CyberSkin.swift tests/check_crate_skin.swift -o .music-sorter/build/check-skin
 .music-sorter/build/check-skin
+swiftc -parse-as-library native/CratePlayer.swift native/AudioSpectrum.swift native/CyberSkin.swift tests/check_cyber_player.swift -o .music-sorter/build/check-cyber-player
+.music-sorter/build/check-cyber-player
 
 # Playback checks (muted, generated temporary audio; no downloads).
 swiftc -parse-as-library native/CratePlayer.swift native/AudioSpectrum.swift tests/check_crate_player.swift -o .music-sorter/build/check-player

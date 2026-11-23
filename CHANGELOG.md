@@ -5,6 +5,90 @@ decisions, validation performed and any checks skipped. Keep this history factua
 the initial entries below summarize retained source, local records and this session,
 rather than reconstruct every past chat message.
 
+## 2026-11-23 — Backend review: label fix and small optimisations
+
+- Reviewed `crate_backend.py` for optimisation. Measured on the real library (156
+  catalog tracks): snapshot ≈0.08 s; verifying one MP3 ≈0.9 s (probe 0.24 s, packet
+  bitrate 0.12 s, full test decode 0.5 s). Soulseek search/transfer time dominates;
+  no large backend bottleneck was found.
+- Fix: the genre/vibe label command saved jobs taken from `snapshot()`, whose
+  display-only statuses (e.g. "File moved or missing" → review) could be written
+  back to disk and cause needless re-searches. It now edits the stored jobs.
+- Bitrate measurement reads ffprobe packets in compact text instead of JSON
+  (output 1.26 MB → 0.46 MB for one track; time unchanged at ≈0.1 s). Unknown
+  `N/A` values are skipped.
+- An import run lists `juan music` audio once instead of once per row. The catalog
+  is still re-read per row so tracks organized earlier in the same run count as
+  existing.
+- Validation: three new regression tests (label status preserved — fails on the old
+  code; supplied library listing; 192 kbps MP3 measured within 8 kbps). Full suite
+  with `.music-sorter/audio-env/bin/python`: 40 passed. One baseline run before the
+  change had a single failure that did not reproduce in two reruns (flaky; not
+  investigated). No Swift change, so no rebuild; app not relaunched.
+
+## 2026-11-21 — Cyber · Lilac end-to-end testing
+
+- Ran the real `CrateView` (real model, backend snapshot and fixture collection)
+  offscreen in a throwaway test bundle with its own bundle ID, root = the worktree's
+  three generated test tones. Clicks went to the skin's reference coordinates and
+  state was read back from rendered pixels with on-device text recognition. 20
+  checks passed: Play on an empty deck loads the first collection track; the clock
+  advances; next keeps playing; previous within 3 s steps back, after 3 s restarts;
+  next stops at the last track; paused stepping stays paused; stop; drawer open and
+  close (skin rescales and still plays); play at the 800 × 720 minimum window, at
+  45% Player size and at 1600 × 1050; Amped → Cyber round trip keeps the deck. The
+  harness is scratch tooling and is not committed (it strips `@main` from a copy of
+  `Crate.swift`).
+- Fix: at small Player sizes the screen and field text fell to about 3 pt and could
+  not be read. Screen title/artist/status and the field text now keep minimum
+  legible sizes (9/8/7.5/7 pt).
+- `check_cyber_player` now also checks arrow keys on the focused volume ring (+5%)
+  and seek knob (+5 s); passed. Skin and collection checks and both-architecture
+  `./build-crate` passed again. The rebuilt LiStD.app launched on the Cyber skin,
+  stayed running for 8 s and quit with no crash report; the saved skin was restored
+  to Original.
+- Test-only incident: during harness setup, a titled test window was moved onto the
+  visible screen by macOS for a few seconds before it was made transparent and
+  pinned offscreen. Harness crash reports in DiagnosticReports are from early
+  harness runs (`fatalError` timeouts and an invalid key), not from LiStD.
+- Final rerun: 21 checks passed, including an assertion that the test window was
+  never visible on any screen (transparent and pinned offscreen from creation). The
+  crash-report count stayed at the three early harness reports, so neither the final
+  harness nor the rebuilt LiStD.app produced any.
+- Still not done: clicking in the visible app window (no Screen Recording or
+  Accessibility permission for this session); the user chose to do that click-through
+  themselves. Pushing the branch was blocked by a permission check.
+
+## 2026-11-21 — Cyber · Lilac skin
+
+- Added **Cyber · Lilac** (`native/CyberSkin.swift`), a fifth skin recreating the
+  user-supplied lilac media-player image. Outlines were traced from the image's own
+  545 × 448 pixels (region spans per row) and colours sampled from it; the artwork
+  is vector, so it stays sharp at any Player size. The reference's brand text was
+  replaced with a LiStD wordmark at the user's request.
+- Every element works: live spectrum screen (eye toggles it), seek knob, volume
+  ball on the pink ring with +/− marks and speaker mute, speed arrows and reset mark,
+  scrolling title field, elapsed/remaining time field, Tracks & imports and open-file
+  buttons, minimize/close, and a seven-control transport ring. Previous/next step
+  through the collection pane's visible order (new `CollectionBrowser.neighbour`);
+  decisions on prev/next, screen content, branding and control mapping were
+  confirmed with the user before implementation.
+- Cyber uses the light appearance and Amped's taller player minimum (shared via
+  `CrateSkin.isArtwork`); the Player size row is now one shared view for both.
+- Validation: new `tests/check_cyber_player.swift` sends real mouse clicks/drags to
+  every Cyber control in an offscreen window (muted player, generated silence) and
+  passed; `check_crate_skin` gained Cyber landmark-colour, transparency and
+  volume-ring round-trip checks and passed; `check_collection` gained stepping checks
+  and passed. A side-by-side/overlay comparison with the reference was used to tune
+  the ring path and shading (ring within about 5 px; horn shading within a few
+  levels). Player, dual-deck, slider, spectrum and no-UI Keychain checks passed; the
+  Python suite passed (37 tests). Both architectures built with `./build-crate` in
+  the worktree, using generated test tones there, never the real collection.
+- Not verified: the rebuilt app window could not be screenshotted or clicked from
+  this session (no Screen Recording permission or desktop control), so the skin was
+  checked through offscreen renders and the hosted-control test, not in the visible
+  app window. No downloads were started.
+
 ## 2026-11-21 — Final rebuilt-binary verification
 
 - Confirmed the final rebuilt LiStD binary refreshes the real collection after

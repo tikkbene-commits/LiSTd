@@ -1,11 +1,13 @@
 import SwiftUI
 
 enum CrateSkin: String, CaseIterable, Identifiable {
-    case boombox, silverwave, classic, technical
+    case boombox, silverwave, classic, technical, cyber
     var id: String { rawValue }
-    var title: String { self == .technical ? "Signal · Dual Deck" : self == .boombox ? "Amped · Blue / Red" : self == .silverwave ? "Silverwave" : "LiStD · Original" }
+    var title: String { self == .cyber ? "Cyber · Lilac" : self == .technical ? "Signal · Dual Deck" : self == .boombox ? "Amped · Blue / Red" : self == .silverwave ? "Silverwave" : "LiStD · Original" }
     var icon: String { self == .silverwave ? "CrateSilverwave" : "Crate" }
-    var accent: Color { self == .technical ? Color(red: 0.34, green: 0.84, blue: 0.53) : self == .boombox ? Color(red: 0.84, green: 0.025, blue: 0.055) : self == .silverwave ? Color(red: 0.39, green: 0.25, blue: 0.66) : .blue }
+    var accent: Color { self == .cyber ? Color(red: 0.38, green: 0.40, blue: 0.63) : self == .technical ? Color(red: 0.34, green: 0.84, blue: 0.53) : self == .boombox ? Color(red: 0.84, green: 0.025, blue: 0.055) : self == .silverwave ? Color(red: 0.39, green: 0.25, blue: 0.66) : .blue }
+    /// Skins drawn as full-size vector artwork that need a taller player pane.
+    var isArtwork: Bool { self == .boombox || self == .cyber }
 
     static let metal = LinearGradient(colors: [Color(red: 0.97, green: 0.97, blue: 1),
         Color(red: 0.76, green: 0.77, blue: 0.84), Color(red: 0.88, green: 0.89, blue: 0.94),
