@@ -286,11 +286,18 @@ def verify(path, row, minimum):
     lossless = data['codec'] in LOSSLESS or data['codec'].startswith('pcm_')
     measured = None
     if not lossless:
+        # Compact "key=value|key=value" lines are ~3x smaller than JSON for thousands of packets.
         raw = sorter.run_media(['ffprobe', '-v', 'error', '-protocol_whitelist', 'file,pipe',
-            '-select_streams', 'a:0', '-show_entries', 'packet=size,duration_time', '-of', 'json', str(path)])
-        packets = json.loads(raw).get('packets', [])
-        duration = sum(float(p.get('duration_time', 0)) for p in packets)
-        size = sum(int(p.get('size', 0)) for p in packets)
+            '-select_streams', 'a:0', '-show_entries', 'packet=size,duration_time', '-of', 'compact=p=0', str(path)])
+        duration = size = 0
+        for line in raw.decode('utf-8', errors='replace').splitlines():
+            fields = dict(part.split('=', 1) for part in line.split('|') if '=' in part)
+            with contextlib.suppress(ValueError):  # ffprobe writes N/A for unknown values
+                duration += float(fields.get('duration_time', 0))
+            with contextlib.suppress(ValueError):
+                size += int(fields.get('size', 0))
+        if not math.isfinite(duration):
+            duration = 0
         if duration <= 0 or size <= 0:
             raise ValueError('Cannot measure the audio bitrate.')
         measured = round(size*8/duration/1000, 2)
@@ -394,17 +401,24 @@ def correct_import(root, job_id, index=None, artist=None, title=None):
         return job
 
 
-def existing_track(root, row, minimum):
+def library_files(root):
+    """Audio in the read-only collection, with normalized names; list once per import run."""
+    library = root/'juan music'
+    if not library.is_dir():
+        return []
+    return [(p, normalize(p.stem)) for p in library.rglob('*') if p.suffix.casefold() in sorter.AUDIO]
+
+
+def existing_track(root, row, minimum, library=None):
+    # The catalog is re-read per row: tracks organized earlier in this run count as existing.
     path = root/'.music-sorter/catalog.json'
     cached = json.loads(path.read_text()).get('tracks', {}) if path.exists() else {}
     candidates = [root/t['path'] for t in cached.values()
                   if normalize(t.get('artist', '')) == normalize(row['artist'])
                   and title_key(t.get('title', '')) == title_key(row['title'])]
-    library = root/'juan music'
-    if library.is_dir():
-        candidates += [p for p in library.rglob('*') if p.suffix.casefold() in sorter.AUDIO
-                       and normalize(row['artist']) in normalize(p.stem)
-                       and title_key(row['title']) in normalize(p.stem)]
+    artist, title = normalize(row['artist']), title_key(row['title'])
+    candidates += [p for p, name in (library_files(root) if library is None else library)
+                   if artist in name and title in name]
     for candidate in candidates:
         if candidate.is_file() and not candidate.is_symlink():
             try:
@@ -692,12 +706,13 @@ def run_job(root, job_id, credentials=None, deep=False, index=None, candidate=No
         cancel.unlink(missing_ok=True)
         job.update(status='running', message='Searching Soulseek', pid=os.getpid())
         save_job(root, job)
+        library = library_files(root)
         for row in rows:
             if cancel.exists():
                 break
             if row['status'] in ('ready', 'existing') and Path(row['path']).is_file():
                 continue
-            existing = existing_track(root, row, job['minimum'])
+            existing = existing_track(root, row, job['minimum'], library)
             if existing:
                 row.update(existing)
                 save_job(root, job)
@@ -953,7 +968,10 @@ def main(argv=None):
                 sorter.apply_plan(root, state, changes, state['layout'])
                 sorter.save(root, state)
                 result = dict(track, path=str(root/track['path']))
-            for job in snapshot(root)['jobs']:
+            # Edit the stored jobs, not snapshot()'s display view, whose derived
+            # statuses (e.g. "File moved") must never be written back to disk.
+            for stored in sorted((root/'.music-sorter/crate/jobs').glob('*/job.json')):
+                job = json.loads(stored.read_text())
                 changed = False
                 for row in job['tracks']:
                     if row.get('track_id') == args.id:

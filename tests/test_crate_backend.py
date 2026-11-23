@@ -174,6 +174,22 @@ class PipelineTests(unittest.TestCase):
             result = sorter.scan(self.root, state, min_age=0)
             self.assertEqual(result['tracks_total'] if 'tracks_total' in result else len(state['tracks']), 0)
 
+    def test_measured_mp3_bitrate_is_read_from_packets(self):
+        mp3 = self.audio(name='Fixture - Pulse.mp3', bitrate=192)
+        checked = crate.verify(mp3, self.job['tracks'][0], 150)
+        self.assertFalse(checked['lossless'])
+        self.assertAlmostEqual(checked['measured_kbps'], 192, delta=8)
+
+    def test_existing_track_uses_a_supplied_library_listing(self):
+        path = self.audio()
+        target = self.root/'juan music'/path.name
+        path.rename(target)
+        listing = crate.library_files(self.root)
+        with patch.object(crate, 'library_files', side_effect=AssertionError('rescanned')):
+            result = crate.existing_track(self.root, self.job['tracks'][0], 320, listing)
+            self.assertIsNone(crate.existing_track(self.root, dict(self.job['tracks'][0], title='Other'), 320, listing))
+        self.assertEqual(result['path'], str(target))
+
     def test_existing_library_is_not_moved(self):
         path = self.audio()
         target = self.root/'juan music'/path.name
@@ -334,6 +350,27 @@ class PipelineTests(unittest.TestCase):
         with index.open() as f:
             indexed = list(csv.DictReader(f))[0]
         self.assertEqual(indexed, {'filepath': changed['path'], 'title': 'Pulse', 'state': '1'})
+
+    def test_label_action_does_not_persist_display_only_statuses(self):
+        job = crate.create_job(self.root, 'Artist,Title\nFixture,Pulse\nGone,Track\n', 'Two rows', 'artist-title', 320)
+        staging = self.root/'downloads/.incoming'/job['id']
+        staging.mkdir(parents=True)
+        path = self.audio()
+        moved = staging/path.name
+        path.rename(moved)
+        crate.complete_hook(self.root, job['id'], 0, moved)
+        folder = crate.job_dir(self.root, job['id'])
+        job['tracks'][0].update(json.loads((folder/'hook-0.json').read_text()))
+        # snapshot() shows this missing file as "review"; that view must not be saved.
+        job['tracks'][1].update(status='existing', path=str(self.root/'juan music/missing.flac'), note='Already in your library')
+        crate.save_job(self.root, job)
+        with contextlib.redirect_stdout(io.StringIO()):
+            code = crate.main(['--root', str(self.root), 'label', job['tracks'][0]['track_id'],
+                               '--genre', 'Dub Techno', '--vibe', 'Basement Business'])
+        self.assertEqual(code, 0)
+        stored = crate.load_job(self.root, job['id'])['tracks']
+        self.assertIn('Dub Techno/Basement Business', stored[0]['path'])
+        self.assertEqual((stored[1]['status'], stored[1]['note']), ('existing', 'Already in your library'))
 
 
 if __name__ == '__main__':
