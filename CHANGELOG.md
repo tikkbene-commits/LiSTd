@@ -5,6 +5,27 @@ decisions, validation performed and any checks skipped. Keep this history factua
 the initial entries below summarize retained source, local records and this session,
 rather than reconstruct every past chat message.
 
+## 2026-11-25 — Save password checkbox; stay signed in after relaunch
+
+- User request: stop asking for the Soulseek login every time the app opens, and save
+  it securely only when the user ticks "Save password".
+- Cause: the account was already in Keychain, but the ad-hoc signature's designated
+  requirement is a cdhash, which changes on every rebuild. Each rebuilt app was a new
+  identity to the entry's access list, so the silent startup read failed and the user
+  retyped the password.
+- The account sheet has a **Save password** checkbox (`listd.savePassword`, default on).
+  Ticked: the account is stored in Keychain (service unchanged). Unticked: the
+  account stays in memory for this session only, and any saved entry is removed.
+- `SoulseekKeychain.save` now deletes and re-adds the entry, so the build that signed
+  in owns it and later launches of that build read it without a prompt.
+- When the silent startup read fails and Save password is on, the app asks macOS once
+  on a background task (choose Always Allow), instead of requiring a retyped password.
+  The window stays usable; the manual Unlock saved account button remains.
+- Validation: `./build-crate` rebuilt the app; `tests/check_keychain_startup.swift`
+  passed (the non-interactive read returned -25293 immediately and restored the UI
+  policy). Not tested: a live sign-in, the macOS prompt, or a relaunch, since those
+  need the user at the Mac.
+
 ## 2026-11-25 — Limehead merged; README, guide and screenshots; alpha label
 
 - Pull request #6 (Limehead · Mix) was merged into `main` on the user's instruction.

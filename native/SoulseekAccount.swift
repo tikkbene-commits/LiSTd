@@ -41,13 +41,13 @@ enum SoulseekKeychain {
     }
 
     static func save(_ account: SoulseekAccount) throws {
-        let values = [kSecValueData as String: try JSONEncoder().encode(account)]
-        let status = SecItemUpdate(query as CFDictionary, values as CFDictionary)
-        if status == errSecItemNotFound {
-            var item = query.merging(values) { _, new in new }
-            item[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-            try check(SecItemAdd(item as CFDictionary, nil))
-        } else { try check(status) }
+        // Replace rather than update: a new entry's access list trusts the build that created it,
+        // so the next launch of this same build reads it silently.
+        try remove()
+        var item = query
+        item[kSecValueData as String] = try JSONEncoder().encode(account)
+        item[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        try check(SecItemAdd(item as CFDictionary, nil))
     }
 
     static func remove() throws {

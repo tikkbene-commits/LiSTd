@@ -86,6 +86,9 @@ struct ReviewAudioInfo: Decodable {
     @Published var accountError: String?
     @Published var accountUsername = ""
     @Published var accountNeedsUnlock = false
+    @Published var savePassword = UserDefaults.standard.object(forKey: "listd.savePassword") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(savePassword, forKey: "listd.savePassword") }
+    }
     private var account: SoulseekAccount?
     var fetching = false
     var initialized = false
@@ -116,6 +119,9 @@ struct ReviewAudioInfo: Decodable {
         } catch {
             accountNeedsUnlock = true
             accountError = "macOS needs permission to read the saved account. Choose Unlock saved account; your existing Keychain entry is preserved."
+            // A rebuilt app is a new identity to Keychain. Ask macOS once in the background
+            // (choose Always Allow) instead of making the user retype the password.
+            if savePassword { Task { @MainActor in self.unlockAccount() } }
         }
     }
 
@@ -284,7 +290,8 @@ struct ReviewAudioInfo: Decodable {
             self.signingIn = false
             do {
                 _ = try result.get()
-                try SoulseekKeychain.save(candidate)
+                // Not saving keeps the account in memory for this session only.
+                if self.savePassword { try SoulseekKeychain.save(candidate) } else { try SoulseekKeychain.remove() }
                 self.account = candidate
                 self.accountUsername = candidate.username
                 self.configured = true
@@ -928,11 +935,14 @@ struct SoulseekAccountPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Soulseek account").font(.title2.bold())
-            Text("Sign in with your Soulseek username and password. Your password is saved in this Mac’s Keychain.")
+            Text("Sign in with your Soulseek username and password. A saved password is stored securely in this Mac’s Keychain, never in a file.")
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             TextField("Username", text: $username).textContentType(.username)
             SecureField("Password", text: $password).textContentType(.password)
                 .onSubmit { signIn() }
+            Toggle("Save password", isOn: $model.savePassword)
+                .toggleStyle(.checkbox)
+                .help("Stay signed in next time you open LiStD. Untick to sign in only for this session.")
             Text("Sign-in checks your connection without downloading music. Close other Soulseek clients using this account.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if let error = model.accountError { Text(error).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }

@@ -42,6 +42,10 @@ Startup reads Keychain with authentication UI disabled. A rebuilt ad-hoc app can
 need reauthorization; its account sheet offers **Unlock saved account**, which
 requests the same existing entry on a background task. This keeps startup/playback
 usable without bypassing macOS approval or changing/deleting stored credentials.
+If that silent read fails and **Save password** (`listd.savePassword`, default on) is
+ticked, the app makes the same request once automatically in the background. Signing in
+with Save password unticked keeps the account in memory only and removes any saved entry;
+saving re-creates the entry so the signing-in build owns its access list.
 
 Every skin has the same resizable collection pane on the left, and a player above
 a collapsible **Tracks & imports** drawer on the right. Native `HSplitView` and
