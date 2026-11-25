@@ -3,7 +3,7 @@ import SwiftUI
 enum CrateSkin: String, CaseIterable, Identifiable {
     case boombox, silverwave, classic, technical, cyber, limehead
     var id: String { rawValue }
-    var title: String { self == .limehead ? "Limehead · Mix" : self == .cyber ? "Cyber · Lilac" : self == .technical ? "Signal · Dual Deck" : self == .boombox ? "Amped · Blue / Red" : self == .silverwave ? "Silverwave" : "LiStD · Original" }
+    var title: String { self == .limehead ? "Limehead · Mix (alpha)" : self == .cyber ? "Cyber · Lilac" : self == .technical ? "Signal · Dual Deck" : self == .boombox ? "Amped · Blue / Red" : self == .silverwave ? "Silverwave" : "LiStD · Original" }
     var icon: String { self == .silverwave ? "CrateSilverwave" : "Crate" }
     var accent: Color { self == .limehead ? Color(red: 0.24, green: 0.55, blue: 0.0) : self == .cyber ? Color(red: 0.38, green: 0.40, blue: 0.63) : self == .technical ? Color(red: 0.34, green: 0.84, blue: 0.53) : self == .boombox ? Color(red: 0.84, green: 0.025, blue: 0.055) : self == .silverwave ? Color(red: 0.39, green: 0.25, blue: 0.66) : .blue }
     /// Skins drawn as full-size vector artwork that need a taller player pane.

@@ -5,6 +5,23 @@ decisions, validation performed and any checks skipped. Keep this history factua
 the initial entries below summarize retained source, local records and this session,
 rather than reconstruct every past chat message.
 
+## 2026-11-25 — Limehead merged; README, guide and screenshots; alpha label
+
+- Pull request #6 (Limehead · Mix) was merged into `main` on the user's instruction.
+- Limehead is an **alpha** skin: the Skin menu now reads "Limehead · Mix (alpha)"
+  (`CrateSkin.title`), and the README, CRATE.md and APP_CONTEXT.md say so. It was not
+  labelled before; keep the label until the user says otherwise.
+- README: six skins, a Limehead table row, a new `docs/images/limehead.png` with a short
+  how-to and an alpha notice, and the preview-regeneration command now lists the files
+  Limehead needs. CRATE.md gained a Limehead section and its check command.
+- `scripts/render_readme.swift` now also renders Limehead with both example decks playing
+  silently (muted, so the screen shows a live oscilloscope trace) and six example
+  playlist rows; no account or collection is read. Signal and Amped previews re-rendered
+  byte-identical in size to the existing ones.
+- Validation: skin and Limehead checks passed; `./build-crate` rebuilt the app. The
+  preview was rendered offscreen, not captured from the running app; the rebuilt app was
+  not relaunched because an import was running in the open copy.
+
 ## 2026-11-25 — Limehead · Mix: traced face, jaw, wings and speakers; old-Windows visualiser
 
 - User feedback: the face looked sad not strict, the visualiser should look like the

@@ -15,7 +15,7 @@ A native Mac app for collecting, organizing and auditioning music for your next 
 
 <img src="docs/images/amped.png" alt="LiStD’s Amped skin: a blue boombox with red lettering, playback controls and a pitch fader" width="760">
 
-<sub>Amped · Blue / Red — one of five built-in skins. Interface previews use generated example audio.</sub>
+<sub>Amped · Blue / Red — one of six built-in skins. Interface previews use generated example audio.</sub>
 
 </div>
 
@@ -138,7 +138,7 @@ Missing tracks offer individual or batch **Deep search**, with bounded fallback
 queries and ambiguous candidates held for review. Original import fields and all
 quality/verification checks remain in effect.
 
-## Five ways to listen
+## Six ways to listen
 
 | Skin | Feel |
 | --- | --- |
@@ -147,12 +147,26 @@ quality/verification checks remain in effect.
 | **Silverwave** | Silver and purple, with a classic media-player feel |
 | **LiStD · Original** | The straightforward native macOS workspace |
 | **Cyber · Lilac** | A sculpted lilac player with a volume ring, live spectrum screen and a transport ring that steps through your collection |
+| **Limehead · Mix** *(alpha)* | A lime-green head with a red oscilloscope screen and speaker wings. The left wing is a two-deck mixer — crossfader, master and per-deck level, pitch and low/mid/high cut — and the right wing lists your collection |
 
 Switch with the **Skin** menu. Your library and imports stay available across skins.
 Playback supports play/pause, stop, seeking, volume and **0.5×–1.5× speed**. Speed also
 changes pitch; there is no key lock.
 
 <img src="docs/images/signal.png" alt="Signal’s dark dual-deck player showing two example tracks, green waveforms, beat cues, tempo controls and independent EQ" width="1080">
+
+<img src="docs/images/limehead.png" alt="Limehead · Mix (alpha): a green head with a red oscilloscope screen, a two-deck mixer in the left wing and the collection playlist in the right wing" width="1080">
+
+> **Limehead · Mix is an alpha skin.** It works, but its artwork, layout and controls are
+> still being refined and may change between versions. It was traced from a supplied
+> screenshot and has only been checked offscreen and with automated tests so far.
+
+In **Limehead**, load tracks from the library’s **A/B** buttons or from the right wing
+(click the box at its top to switch between deck A and deck B), play each deck, then
+drag **Crossfade** to blend them: all the way left is only A, the middle plays both, all
+the way right is only B. Each deck has level, pitch (±8%) and low/mid/high cut faders;
+**reset** puts the mix back. The gold and blue buttons in the title bar choose which
+deck the head’s screen, transport and seek bar control.
 
 In **Signal**, load files with the library’s **A/B** buttons, a deck’s **Open file**
 button, or a drop onto its waveform. Tracks load paused. Analyze beats, check them
@@ -234,7 +248,7 @@ example audio. To regenerate them without accessing a personal library or accoun
 
 ```sh
 mkdir -p .music-sorter/build
-swiftc -O -parse-as-library native/CrateSkin.swift native/CratePlayer.swift native/BoomboxSkin.swift native/AudioSpectrum.swift native/TechnicalSkin.swift scripts/render_readme.swift -o .music-sorter/build/render-readme
+swiftc -O -parse-as-library native/CrateSkin.swift native/CratePlayer.swift native/BoomboxSkin.swift native/AudioSpectrum.swift native/TechnicalSkin.swift native/CyberSkin.swift native/Collection.swift native/LimeheadSkin.swift native/LimeheadTrace.swift scripts/render_readme.swift -o .music-sorter/build/render-readme
 .music-sorter/build/render-readme docs/images
 ```
 
