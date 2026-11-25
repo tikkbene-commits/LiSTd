@@ -16,9 +16,11 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unicodedata
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote
 
 import music_sorter as sorter
@@ -95,13 +97,26 @@ def job_dir(root, job_id):
     return root/'.music-sorter/crate/jobs'/job_id
 
 
+# Tracks run in parallel threads and completion hooks run in Sockseek's process; both write job.json.
+PARALLEL_TRACKS = 5
+JOB_LOCK = threading.RLock()
+
+
+@contextlib.contextmanager
+def job_file_lock(root, job_id):
+    with JOB_LOCK, (job_dir(root, job_id)/'job.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
 def load_job(root, job_id):
     return json.loads((job_dir(root, job_id)/'job.json').read_text())
 
 
 def save_job(root, job):
-    job['updated'] = time.time()
-    atomic_json(job_dir(root, job['id'])/'job.json', job)
+    with job_file_lock(root, job['id']):
+        job['updated'] = time.time()
+        atomic_json(job_dir(root, job['id'])/'job.json', job)
 
 
 def write_job_input(root, job):
@@ -312,10 +327,18 @@ def verify(path, row, minimum):
 def finish_track(root, job, row, path):
     checked = verify(path, row, job['minimum'])
     # Quality and identity checks happen before the existing organizer may move audio.
-    with sorter.catalog(root) as state:
-        destination = sorter.sockseek_hook(root, state, path)
-        track = next(t for t in state['tracks'].values() if str(root/t['path']) == destination)
-        genre, vibe = sorter.labels(track)
+    for attempt in range(240):
+        try:
+            with sorter.catalog(root) as state:
+                destination = sorter.sockseek_hook(root, state, path)
+                track = next(t for t in state['tracks'].values() if str(root/t['path']) == destination)
+                genre, vibe = sorter.labels(track)
+            break
+        except ValueError as error:
+            # Another track of a parallel import is being organized; its lock is released in seconds.
+            if 'Another music-sorter command' not in str(error) or attempt == 239:
+                raise
+            time.sleep(0.25)
     return {'status': 'ready', 'path': destination, 'track_id': track['id'], 'genre': genre,
             'vibe': vibe, 'bpm': track['bpm'], 'bpm_source': track['bpm_source'],
             'note': 'Genre needs review' if genre == 'Unsorted' else 'Downloaded and organized',
@@ -330,8 +353,11 @@ def complete_hook(root, job_id, index, path):
     staging = root/'downloads/.incoming'/job_id
     if not path.is_relative_to(staging) or not path.is_file() or path.is_symlink():
         raise ValueError('Completion path is outside this import.')
-    row.update(status='checking', note='Checking file quality and tags')
-    save_job(root, job)
+    with job_file_lock(root, job_id):
+        current = load_job(root, job_id)
+        current['tracks'][index].update(status='checking', note='Checking file quality and tags')
+        current['updated'] = time.time()
+        atomic_json(job_dir(root, job_id)/'job.json', current)
     result_path = job_dir(root, job_id)/f'hook-{index}.json'
     try:
         result = finish_track(root, job, row, path)
@@ -459,7 +485,10 @@ def managed_engine(root, config=None):
         available.bind(('127.0.0.1', 0))
         port = available.getsockname()[1]
     with (root/'.music-sorter/crate/engine.log').open('w') as log:
-        command = ['sockseek', 'daemon', '--server-ip', '127.0.0.1', '--server-port', str(port)]
+        # The daemon queues searches itself (Sockseek default: 2); match the parallel track workers.
+        # Its search limiter (34 per 220 s) still guards against Soulseek's 30-minute search ban.
+        command = ['sockseek', 'daemon', '--server-ip', '127.0.0.1', '--server-port', str(port),
+                   '--concurrent-searches', str(PARALLEL_TRACKS), '--concurrent-jobs', str(PARALLEL_TRACKS*2)]
         if config is not None:
             command += ['--config', str(config)]
         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT,
@@ -598,9 +627,10 @@ def deep_search_candidates(root, job, index, cancel):
     for number, query in enumerate(queries):
         if cancel.exists():
             break
-        row.update(status='searching', note=f'Deep search {number+1}/{len(queries)} · {query}')
-        job['message'] = f'{index+1}/{len(job["tracks"])} · {row["artist"]} — {row["title"]} · {row["note"]}'
-        save_job(root, job)
+        with JOB_LOCK:
+            row.update(status='searching', note=f'Deep search {number+1}/{len(queries)} · {query}')
+            job['message'] = progress_message(job)
+            save_job(root, job)
         search_file = folder/f'deep-{index}.csv'
         with search_file.open('w', newline='', encoding='utf-8') as handle:
             writer = csv.writer(handle)
@@ -617,7 +647,8 @@ def deep_search_candidates(root, job, index, cancel):
         command += ['--length-col', 'Length', '--time-format', 's', '--strict-title', 'false',
                     '--strict-artist', 'false', '--no-write-index', '--print', 'json-all']
         log = folder/f'deep-{index}-{number}.jsonlog'
-        result = run_process(command, log, cancel, timeout=45)
+        # Waiting in the daemon's search limiter counts toward this wall-clock limit.
+        result = run_process(command, log, cancel, timeout=240)
         if cancel.exists():
             break
         data = read_candidates(log, result)
@@ -639,10 +670,11 @@ def deep_search_candidates(root, job, index, cancel):
                 uncertain.append(candidate)
         if len(found) >= 3:
             break
-    row['candidate_results'] = uncertain
-    row['candidates'] = [dict(number=i, filename=c['File']['Filename'], username=c['User']['Username'],
-                              reason='Spelling, extra words or metadata placement need confirmation')
-                         for i, c in enumerate(uncertain)]
+    with JOB_LOCK:
+        row['candidate_results'] = uncertain
+        row['candidates'] = [dict(number=i, filename=c['File']['Filename'], username=c['User']['Username'],
+                                  reason='Spelling, extra words or metadata placement need confirmation')
+                             for i, c in enumerate(uncertain)]
     return found[:3]
 
 
@@ -684,8 +716,18 @@ def read_candidates(log, result):
 
 def search_candidates(root, job, index, cancel):
     log = job_dir(root, job['id'])/f'search-{index}.jsonlog'
-    result = run_process(base_command(root, job, index) + ['--print', 'json-all'], log, cancel, timeout=60)
+    # Waiting in the daemon's search limiter counts toward this wall-clock limit.
+    result = run_process(base_command(root, job, index) + ['--print', 'json-all'], log, cancel, timeout=240)
     return [c for c in read_candidates(log, result) if candidate_matches(c, job['tracks'][index])]
+
+
+def progress_message(job):
+    rows = job['tracks']
+    active = [r for r in rows if r['status'] in ('searching', 'downloading', 'checking')]
+    text = f'{job.get("_finished", 0)} of {job.get("_total", len(rows))} done'
+    if active:
+        text += f' · {len(active)} in progress: ' + ', '.join(f'{r["artist"]} — {r["title"]}' for r in active[:PARALLEL_TRACKS])
+    return text
 
 
 def run_job(root, job_id, credentials=None, deep=False, index=None, candidate=None):
@@ -707,41 +749,41 @@ def run_job(root, job_id, credentials=None, deep=False, index=None, candidate=No
         job.update(status='running', message='Searching Soulseek', pid=os.getpid())
         save_job(root, job)
         library = library_files(root)
-        for row in rows:
+
+        def update(row, **fields):
+            with JOB_LOCK:
+                row.update(fields)
+                job['message'] = progress_message(job)
+                save_job(root, job)
+
+        def process(row):
             if cancel.exists():
-                break
+                return
             if row['status'] in ('ready', 'existing') and Path(row['path']).is_file():
-                continue
+                return
             existing = existing_track(root, row, job['minimum'], library)
             if existing:
-                row.update(existing)
-                save_job(root, job)
-                continue
+                update(row, **existing)
+                return
             index = row['index']
             if not deep:
-                row.update(candidates=[], candidate_results=[])
-            row.update(status='searching', note='Searching for an exact match', deep_search=deep)
-            job['message'] = f'{index+1} of {len(job["tracks"])} · {row["artist"]} — {row["title"]}'
-            save_job(root, job)
+                update(row, candidates=[], candidate_results=[])
+            update(row, status='searching', note='Searching for an exact match', deep_search=deep)
             try:
                 candidates = ([selected_candidate] if selected_candidate else deep_search_candidates(root, job, index, cancel)) if deep else search_candidates(root, job, index, cancel)
             except ValueError as error:
-                row.update(status='unavailable', note=str(error))
-                save_job(root, job)
-                continue
+                update(row, status='unavailable', note=str(error))
+                return
             if cancel.exists():
-                row.update(status='stopped', note='Stopped')
-                save_job(root, job)
-                break
+                update(row, status='stopped', note='Stopped')
+                return
             if not candidates:
-                row.update(status='review' if row.get('candidates') else 'unavailable', note='Deep search found candidates needing review.' if row.get('candidates') else 'No exact original-version match at this quality. Try Deep search or supply release information.')
-                save_job(root, job)
-                continue
-            row.update(status='downloading', note='Downloading an exact candidate')
-            save_job(root, job)
+                update(row, status='review' if row.get('candidates') else 'unavailable', note='Deep search found candidates needing review.' if row.get('candidates') else 'No exact original-version match at this quality. Try Deep search or supply release information.')
+                return
+            update(row, status='downloading', note='Downloading an exact candidate')
             hook_result = folder/f'hook-{index}.json'
             hook = completion_command(root, job_id, index)
-            row.update(status='unavailable', note='No peer completed the transfer. Retry to search again.')
+            outcome = dict(status='unavailable', note='No peer completed the transfer. Retry to search again.')
             for attempt, candidate in enumerate(candidates[:3]):
                 hook_result.unlink(missing_ok=True)
                 remote = candidate['File']['Filename'].replace('\\', '/')
@@ -754,18 +796,37 @@ def run_job(root, job_id, credentials=None, deep=False, index=None, candidate=No
                            '--on-complete', hook]
                 result = run_process(command, folder/f'track-{index}-{attempt}.log', cancel)
                 if hook_result.exists():
-                    row.update(json.loads(hook_result.read_text()))
-                    if row['status'] == 'ready':
-                        row.update(candidates=[], candidate_results=[])
+                    outcome = json.loads(hook_result.read_text())
+                    if outcome['status'] == 'ready':
+                        outcome.update(candidates=[], candidate_results=[])
                         break
                 if result == 'cancelled':
-                    row.update(status='stopped', note='Stopped')
+                    outcome = dict(status='stopped', note='Stopped')
                     break
-            save_job(root, job)
-            # Only incomplete transfers from this job are disposable, after its process exits.
-            for remnant in (root/'downloads/.incoming'/job_id).rglob('*.incomplete'):
-                if remnant.is_file() and not remnant.is_symlink():
-                    remnant.unlink()
+            update(row, **outcome)
+            # Only this track's incomplete transfers are disposable; other tracks may still be downloading.
+            for attempt in range(3):
+                for remnant in (root/'downloads/.incoming'/job_id/f'{index}-{attempt}').rglob('*.incomplete'):
+                    if remnant.is_file() and not remnant.is_symlink():
+                        remnant.unlink()
+
+        def lane(group):
+            # Repeated artist/title rows stay in one lane, so later copies reuse the first download.
+            for row in group:
+                try:
+                    process(row)
+                except Exception as error:  # One failing track must not stop the other lanes.
+                    update(row, status='unavailable', note=f'Unexpected error: {error}')
+                with JOB_LOCK:
+                    job['_finished'] = job.get('_finished', 0) + 1
+                    job['message'] = progress_message(job)
+
+        job.update(_finished=0, _total=len(rows))
+        lanes = {}
+        for row in rows:
+            lanes.setdefault((normalize(row['artist']), title_key(row['title'])), []).append(row)
+        with ThreadPoolExecutor(max_workers=PARALLEL_TRACKS) as pool:
+            list(pool.map(lane, lanes.values()))
         job.update(status='stopped' if cancel.exists() else 'finished', message='Stopped' if cancel.exists() else 'Import finished')
         save_job(root, job)
         return job

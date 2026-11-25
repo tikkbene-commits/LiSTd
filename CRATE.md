@@ -192,7 +192,9 @@ Interrupted imports remain available for Retry unfinished on reopening.
 1. Reuse a matching, qualifying file already in the local catalog or `juan music`.
    Existing collection files are never moved by the import workflow.
 2. Start one private Sockseek session on a loopback port for the import. Searches
-   run one CSV row at a time, with one concurrent search/job.
+   run per CSV row, with up to five rows searching/downloading at once. Sockseek's
+   search limiter still applies, so very long imports pause briefly to avoid a
+   Soulseek search ban.
 3. Inspect search results for artist/title evidence and exclude obvious alternate
    versions unless requested in the original title. Download an exact peer file;
    if it cannot complete, try up to two other exact peers.
