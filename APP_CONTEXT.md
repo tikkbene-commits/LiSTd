@@ -59,8 +59,8 @@ The root owns both players and the import model, so changing pane sizes or drawe
 visibility does not recreate playback or cancel imports. Collection selection,
 search, filters and sort live in the root, too.
 
-The five skins are **Amped · Blue / Red**, **Signal · Dual Deck**,
-**Silverwave**, **LiStD · Original** and **Cyber · Lilac**. Amped retains its vector boombox, live
+The six skins are **Amped · Blue / Red**, **Signal · Dual Deck**,
+**Silverwave**, **LiStD · Original**, **Cyber · Lilac** and **Limehead · Mix**. Amped retains its vector boombox, live
 spectrum, chrome transport, shell/side/speaker/vent actions and vertical pitch
 fader. Player size still controls the artwork's fit within its real player pane.
 Silverwave retains its silver/purple panel and decorative display; Original uses
@@ -79,9 +79,48 @@ no wrap at the ends; previous restarts the song after 3 s; a playing deck keeps 
 or opens a file when the collection view is empty), ■ stop. Screen and field text keep minimum
 legible sizes (9/8/7.5/7 pt) when Player size shrinks the artwork. Cyber keeps the shared
 playback strip and Player size row below the artwork, like Amped.
+Limehead · Mix (`native/LimeheadSkin.swift`) recreates the user-supplied green
+"head" media-player screenshot in the reference crop's own pixel space (934 × 498;
+the geometry still calls the width 935). The head and face, screen outline, both
+wings and all six speakers are traced from the screenshot by
+`scripts/trace_limehead.py` into `native/LimeheadTrace.swift` (generated, ~1 MB of
+outline strings; never edit by hand): head outline = dome against the desktop (lime
+test that rejects the teal wallpaper stripe) + sides at the head's dark edge line over
+the wings (fixed search bands, smoothed) + jaw/chin against the desktop; shading = 31
+green-channel brightness layers (marching squares, 0.12 px tolerance, each filled with
+the reference's median colour for its band) with the app's own controls painted out
+first; speakers = their own 26 grey layers inside an ellipse outline fitted to the
+traced rim (centre/tilt from moments, traced area; tilts 56°/49°/45°, mirrored right).
+Wings use no anti-noise blur so the tab stripes and X marks survive; desktop icon and
+wallpaper exclusions are explicit boxes in the script. The reference screenshot is not
+stored in the repo; re-tracing needs it (command in the script docstring). Hand-drawn
+on top: screen fill + visualiser, title pill and its buttons, transport, asterisk,
+window keys, seek groove, icons and the panel interiors (mixer/playlist). The
+reference has no drop shadows, so the skin draws none. `LimeArtwork` is `Equatable`
+and redraws only when a wing opens/closes or the size changes. The visualiser is an
+old-Windows oscilloscope: jagged white traces across and down the screen from the
+focused deck's raw samples (`AudioSpectrum.wave`, 96 points per window), red trails of
+the last 12 frames zooming outward, and a centre hot spot that grows with the level;
+it is clipped to the screen minus the pill and still under Reduce Motion. It is a dual-deck skin (`CrateSkin.isDualDeck`, shared with
+Signal): the collection and import results offer A/B loading. Left wing = mixer:
+Crossfade (constant power, `LimeMixer.gains`) and Master sliders; per deck five
+vertical faders V level / P pitch ±8% / L M H EQ cut (0 to −24 dB), a play button
+and title; **reset** restores crossfader centre, levels 85%, pitch 1.00 and flat EQ.
+Each deck's output volume = master × level × crossfade gain (`LimeMixer.apply`);
+leaving the skin sets both decks back to the master level, and deck B pauses unless
+the new skin is also dual-deck. Right wing = the collection pane's visible tracks
+(current filter/sort); clicking a row loads it paused into the deck named in the
+dropdown (click it to switch A/B); the loaded row is highlighted. Head: gold/blue
+pill buttons choose which deck the screen, title, transport, seek bar and drops
+drive; pill X opens a file into that deck; asterisk toggles the visualiser; |◀◀ ▶▶|
+step through the collection (same rules as Cyber); bars/page icons and the wings'
+X/tabs hide or show the mixer/playlist; the icon under the seek bar toggles Tracks &
+imports; _ / X minimize/close. Faders take arrow keys and VoiceOver adjust. Limehead
+shows only the Player size row below the artwork (no shared playback strip, whose
+volume slider would fight the mixer).
 The ear icon remains `native/Assets/EarIcon.icns`.
 Appearance is set per skin with `NSApp.appearance` (`applyAppearance` in
-`native/Crate.swift`): Signal dark, Amped/Silverwave/Cyber light, Original follows the
+`native/Crate.swift`): Signal dark, Amped/Silverwave/Cyber/Limehead light, Original follows the
 system. Do not use SwiftUI `preferredColorScheme(nil)` to restore the system
 appearance; it leaves a previously forced dark window partly dark.
 
@@ -175,6 +214,9 @@ live peer availability and rate limits remain dependent on Soulseek.
 | `native/BoomboxSkin.swift` | Blue/red boombox vector artwork and central playback/fader controls |
 | `native/CratePlayer.swift` | Local AVFoundation playback engine, mute, spectrum tap and shared seek/speed/volume strip |
 | `native/CyberSkin.swift` | Cyber · Lilac vector artwork traced from the reference, its geometry/palette and live overlay controls |
+| `native/LimeheadSkin.swift` | Limehead · Mix geometry, traced-shape drawing, live controls, red visualiser and `LimeMixer` |
+| `native/LimeheadTrace.swift` | Generated by `scripts/trace_limehead.py`: traced head/face, screen, wings and speakers |
+| `scripts/trace_limehead.py` | Re-traces the Limehead artwork from the reference screenshot (standard library only) |
 | `native/TechnicalSkin.swift` | Signal stacked waveforms, dual-deck transport and EQ controls |
 | `native/AudioSpectrum.swift` | Thread-safe audio frequency analysis and live LED spectrum rendering |
 | `native/Assets/EarIcon.icns` | User-provided application icon, copied into the bundle by each build |
@@ -193,6 +235,7 @@ live peer availability and rate limits remain dependent on Soulseek.
 | `tests/test_music_sorter.py` | Tempo, naming, incremental sorting, collisions, moves, watch and undo checks |
 | `tests/check_crate_skin.swift` | Silverwave emblem, blue/red boombox and Cyber landmark-colour/transparency/volume-ring render checks |
 | `tests/check_cyber_player.swift` | Real mouse clicks/drags on every Cyber control in an offscreen window (muted, generated silence) |
+| `tests/check_limehead.swift` | Limehead landmark colours, crossfade maths and real mouse drags/clicks on its transport, focus, playlist, faders, reset and wings |
 | `tests/check_crate_player.swift` | Generated-audio playback, pause/seek/rate/end/replay, live spectrum tap and pitch response, mute and format-switch checks |
 | `tests/check_dual_deck.swift` | Generated-audio dual playback, beat-phase sync, independent EQ attenuation and source preservation |
 | `tests/test_deck_analysis.py` | Generated-pulse BPM/beat-cue detection, silence and read-only analysis |
@@ -443,6 +486,10 @@ swiftc -parse-as-library native/CrateSkin.swift native/CratePlayer.swift native/
 # Cyber control interaction check (offscreen window, synthetic mouse events).
 swiftc -parse-as-library native/CratePlayer.swift native/AudioSpectrum.swift native/CyberSkin.swift tests/check_cyber_player.swift -o .music-sorter/build/check-cyber-player
 .music-sorter/build/check-cyber-player
+
+# Limehead render + control check (offscreen window, synthetic mouse events).
+swiftc -parse-as-library native/CratePlayer.swift native/AudioSpectrum.swift native/CyberSkin.swift native/Collection.swift native/LimeheadSkin.swift native/LimeheadTrace.swift tests/check_limehead.swift -o .music-sorter/build/check-limehead
+.music-sorter/build/check-limehead
 
 # Muted native playback checks using temporary generated WAV files.
 swiftc -parse-as-library native/CratePlayer.swift native/AudioSpectrum.swift tests/check_crate_player.swift -o .music-sorter/build/check-player

@@ -5,6 +5,50 @@ decisions, validation performed and any checks skipped. Keep this history factua
 the initial entries below summarize retained source, local records and this session,
 rather than reconstruct every past chat message.
 
+## 2026-11-25 — Limehead · Mix: traced face, jaw, wings and speakers; old-Windows visualiser
+
+- User feedback: the face looked sad not strict, the visualiser should look like the
+  old Windows one, the speakers should face outward, and every line of the face and
+  the jaw outline should be copied exactly.
+- New `scripts/trace_limehead.py` traces the reference screenshot into
+  `native/LimeheadTrace.swift`: full head outline (dome, sides, jaw), 31 green
+  brightness layers for head and face (app controls painted out first), the screen
+  outline, both wings (stripes and X marks kept) and six speakers (26 grey layers each,
+  ellipse rims fitted to the traced edge, rms 0.6 px; tilts 56°/49°/45°). Measurements
+  found the reference head centred at x ≈ 464 and ~17 px wider than the hand-drawn one,
+  and the screen's top edge at y ≈ 90 under the pill; geometry now uses those values.
+  Pill, pill buttons (r 10), panels and the drawer icon were re-measured. Drop shadows
+  removed (the reference has none). `LimeArtwork` is `Equatable` so the detailed paths
+  redraw only when a wing toggles or the size changes.
+- Visualiser rebuilt as an oscilloscope: jagged white traces across and down from raw
+  samples (`AudioSpectrum.wave`, new), zooming red trails, centre hot spot; clipped
+  out of the pill.
+- Validation: `check_limehead` (landmark colours re-checked against the reference
+  pixels), spectrum, player, skin and Cyber checks passed; `./build-crate` built both
+  architectures. Offscreen renders compared side by side with the reference at 2–4×.
+  The rebuilt app was not relaunched: an import was running in the open copy.
+
+## 2026-11-25 — Limehead · Mix skin
+
+- New skin recreating the supplied green head media-player screenshot as vector
+  artwork (935 × 498 reference crop, sampled colours, Catmull-Rom head outline,
+  soft-shaded face, silver speakers, red glow visualiser driven by the live
+  spectrum). The player's own controls were kept in their reference positions.
+- Requested change from the reference: the left wing mixes two tracks. Decks A and
+  B (the existing `player`/`deckB`) get a constant-power crossfader, master volume,
+  and per-deck level, pitch (±8%) and low/mid/high cut faders, plus play buttons
+  and a reset. The right wing lists the collection's visible tracks and loads into
+  deck A or B. The head's pill arrows pick which deck the head controls.
+- `CrateSkin.isDualDeck` (Signal + Limehead) now drives A/B load buttons and
+  whether deck B pauses on a skin change; collection stepping takes a deck.
+- Validation: new `tests/check_limehead.swift` passed (landmark colours,
+  crossfade gains, and real mouse events on transport, focus, playlist, seek,
+  crossfader/master, level/pitch/EQ faders, reset, wing hide/show, volume hand-back).
+  `./build-crate` built both architectures; existing skin and Cyber control checks
+  passed. Python suite not rerun (no backend change). The rebuilt app was not
+  launched for a visual inspection of the real window in this session; the
+  artwork and live view were compared offscreen against the reference instead.
+
 ## 2026-11-23 — Backend review: label fix and small optimisations
 
 - Reviewed `crate_backend.py` for optimisation. Measured on the real library (156
