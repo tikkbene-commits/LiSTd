@@ -5,6 +5,27 @@ decisions, validation performed and any checks skipped. Keep this history factua
 the initial entries below summarize retained source, local records and this session,
 rather than reconstruct every past chat message.
 
+## 2026-11-25 — Limehead · Mix skin
+
+- New skin recreating the supplied green head media-player screenshot as vector
+  artwork (935 × 498 reference crop, sampled colours, Catmull-Rom head outline,
+  soft-shaded face, silver speakers, red glow visualiser driven by the live
+  spectrum). The player's own controls were kept in their reference positions.
+- Requested change from the reference: the left wing mixes two tracks. Decks A and
+  B (the existing `player`/`deckB`) get a constant-power crossfader, master volume,
+  and per-deck level, pitch (±8%) and low/mid/high cut faders, plus play buttons
+  and a reset. The right wing lists the collection's visible tracks and loads into
+  deck A or B. The head's pill arrows pick which deck the head controls.
+- `CrateSkin.isDualDeck` (Signal + Limehead) now drives A/B load buttons and
+  whether deck B pauses on a skin change; collection stepping takes a deck.
+- Validation: new `tests/check_limehead.swift` passed (landmark colours,
+  crossfade gains, and real mouse events on transport, focus, playlist, seek,
+  crossfader/master, level/pitch/EQ faders, reset, wing hide/show, volume hand-back).
+  `./build-crate` built both architectures; existing skin and Cyber control checks
+  passed. Python suite not rerun (no backend change). The rebuilt app was not
+  launched for a visual inspection of the real window in this session; the
+  artwork and live view were compared offscreen against the reference instead.
+
 ## 2026-11-23 — Backend review: label fix and small optimisations
 
 - Reviewed `crate_backend.py` for optimisation. Measured on the real library (156

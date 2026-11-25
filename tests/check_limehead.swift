@@ -24,7 +24,7 @@ import AVFoundation
             let c = rgb(x, y)
             precondition(c.a > 0.9 && c.g > c.r * 1.25 && c.g > c.b * 1.5, "\(what) should be lime green at \(x),\(y): \(c)")
         }
-        green(470, 40, "Crown of the head")
+        green(520, 78, "Top of the head")
         green(470, 395, "Nose")
         green(200, 119, "Left wing bevel")
         green(735, 119, "Right wing bevel")
