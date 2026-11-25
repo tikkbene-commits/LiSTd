@@ -278,25 +278,28 @@ def probe(path):
     return {'codec': stream.get('codec_name', ''), 'duration': duration, 'tags': tags}
 
 
-def verify(path, row, minimum):
+def verify(path, row, minimum, confirmed=False):
+    """confirmed: the user listened and vouched for identity; quality and decode checks still apply."""
     data = probe(path)
     tags = data['tags']
     if data['codec'] not in LOSSLESS | {'mp3'} and not data['codec'].startswith('pcm_'):
         raise ValueError('Audio codec is outside the selected MP3/lossless formats.')
-    if row.get('deep_search'):
+    if confirmed:
+        pass
+    elif row.get('deep_search'):
         evidence = deep_identity(str(path), row, tags)
         if evidence != 'confident':
             raise ValueError('Deep-search identity needs review: filename/tags do not establish the original artist, title and version.')
     elif tags.get('title') and title_key(tags['title']) != title_key(row['title']):
         raise ValueError(f'Title tag differs: {tags["title"]}')
-    if not row.get('deep_search') and tags.get('artist') and normalize(tags['artist']) != normalize(row['artist']):
+    if not confirmed and not row.get('deep_search') and tags.get('artist') and normalize(tags['artist']) != normalize(row['artist']):
         raise ValueError(f'Artist tag differs: {tags["artist"]}')
     name = normalize(path.stem)
-    if not row.get('deep_search') and not tags.get('title') and not filename_title_matches(path, row):
+    if not confirmed and not row.get('deep_search') and not tags.get('title') and not filename_title_matches(path, row):
         raise ValueError('No matching title tag or filename evidence.')
-    if not row.get('deep_search') and not tags.get('artist') and normalize(row['artist']) not in name:
+    if not confirmed and not row.get('deep_search') and not tags.get('artist') and normalize(row['artist']) not in name:
         raise ValueError('No matching artist tag or filename evidence.')
-    if row.get('length') and abs(data['duration']-row['length']) > 3:
+    if not confirmed and row.get('length') and abs(data['duration']-row['length']) > 3:
         raise ValueError('Duration differs from the supplied track duration.')
     lossless = data['codec'] in LOSSLESS or data['codec'].startswith('pcm_')
     measured = None
@@ -318,14 +321,14 @@ def verify(path, row, minimum):
         measured = round(size*8/duration/1000, 2)
         if measured < minimum:
             raise ValueError(f'Measured bitrate {measured:g} kbps is below {minimum} kbps.')
-    data.update(lossless=lossless, measured_kbps=measured)
+    data.update(lossless=lossless, measured_kbps=measured, user_confirmed=confirmed)
     sorter.run_media(['ffmpeg', '-v', 'error', '-xerror', '-nostdin', '-protocol_whitelist', 'file,pipe',
                       '-i', str(path), '-map', '0:a:0', '-f', 'null', '-'])
     return data
 
 
-def finish_track(root, job, row, path):
-    checked = verify(path, row, job['minimum'])
+def finish_track(root, job, row, path, confirmed=False):
+    checked = verify(path, row, job['minimum'], confirmed)
     # Quality and identity checks happen before the existing organizer may move audio.
     for attempt in range(240):
         try:
@@ -341,7 +344,8 @@ def finish_track(root, job, row, path):
             time.sleep(0.25)
     return {'status': 'ready', 'path': destination, 'track_id': track['id'], 'genre': genre,
             'vibe': vibe, 'bpm': track['bpm'], 'bpm_source': track['bpm_source'],
-            'note': 'Genre needs review' if genre == 'Unsorted' else 'Downloaded and organized',
+            'note': 'Genre needs review' if genre == 'Unsorted' else
+                    'Confirmed by you and organized' if confirmed else 'Downloaded and organized',
             'quality': 'Lossless' if checked['lossless'] else f'{checked["measured_kbps"]:g} kbps',
             'verification': {k: v for k, v in checked.items() if k != 'tags'}}
 
@@ -377,10 +381,10 @@ def review_path(root, job, row):
     return path
 
 
-def recheck_track(root, job, row):
+def recheck_track(root, job, row, confirmed=False):
     path = review_path(root, job, row)
     try:
-        result = finish_track(root, job, row, path)
+        result = finish_track(root, job, row, path, confirmed)
     except (ValueError, OSError) as error:
         result = {'status': 'review', 'note': str(error), 'path': str(path)}
     row.update(result)
@@ -390,7 +394,12 @@ def recheck_track(root, job, row):
     save_job(root, job)
 
 
-def correct_import(root, job_id, index=None, artist=None, title=None):
+def correct_import(root, job_id, index=None, artist=None, title=None, confirm=False, confirm_all=False):
+    """Swap an import, correct one staged file, or confirm staged files the user has listened to.
+
+    Confirmation accepts the file's identity on the user's word; codec, measured bitrate and a
+    complete decode are still required, so low-quality files stay staged for review.
+    """
     # Use the import lock so a UI correction cannot race a transfer or its hook.
     with (root/'.music-sorter/crate/download.lock').open('a') as lock:
         try:
@@ -398,9 +407,12 @@ def correct_import(root, job_id, index=None, artist=None, title=None):
         except BlockingIOError:
             raise ValueError('Wait until the current import finishes before reviewing tracks.')
         job = load_job(root, job_id)
-        if index is None:
-            if any(r['status'] in ('ready', 'existing') for r in job['tracks']):
-                raise ValueError('Only swap an import before any tracks have been accepted.')
+        if confirm_all:
+            rows = [r for r in job['tracks'] if r['status'] == 'review' and r.get('path')]
+            if not rows:
+                raise ValueError('No downloaded files are waiting for review in this import.')
+        elif index is None:
+            # Accepted files keep their verified audio; only the import's labels are corrected.
             rows = job['tracks']
             for row in rows:
                 row['artist'], row['title'] = row['title'], row['artist']
@@ -420,7 +432,7 @@ def correct_import(root, job_id, index=None, artist=None, title=None):
         for row in rows:
             if row['status'] == 'review' and row.get('path'):
                 try:
-                    recheck_track(root, job, row)
+                    recheck_track(root, job, row, confirmed=confirm or confirm_all)
                 except ValueError as error:
                     row['note'] = str(error)
                     save_job(root, job)
@@ -971,6 +983,9 @@ def main(argv=None):
         if name == 'review-track':
             cmd.add_argument('--artist', required=True)
             cmd.add_argument('--title', required=True)
+            cmd.add_argument('--confirm', action='store_true')
+    cmd = sub.add_parser('confirm-reviews')
+    cmd.add_argument('id')
     cmd = sub.add_parser('hook')
     cmd.add_argument('id')
     cmd.add_argument('index', type=int)
@@ -1000,7 +1015,9 @@ def main(argv=None):
         elif args.command == 'swap-order':
             result = correct_import(root, args.id)
         elif args.command == 'review-track':
-            result = correct_import(root, args.id, args.index, args.artist, args.title)
+            result = correct_import(root, args.id, args.index, args.artist, args.title, args.confirm)
+        elif args.command == 'confirm-reviews':
+            result = correct_import(root, args.id, confirm_all=True)
         elif args.command == 'review-info':
             job = load_job(root, args.id)
             if not 0 <= args.index < len(job['tracks']):

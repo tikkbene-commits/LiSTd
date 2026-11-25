@@ -223,8 +223,10 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(list(csv.DictReader(f))[0], {'Artist': 'Fixture', 'Title': 'Pulse', 'Duration': '8', 'Extra': 'keep'})
         self.assertIn(row['path'], (folder/'index-0.csv').read_text())
         self.assertEqual(json.loads((folder/'hook-0.json').read_text())['path'], row['path'])
-        with self.assertRaisesRegex(ValueError, 'before any tracks'):
-            crate.correct_import(self.root, job['id'])
+        # A later swap only relabels accepted rows; their verified files stay where they are.
+        again = crate.correct_import(self.root, job['id'])['tracks'][0]
+        self.assertEqual((again['artist'], again['title'], again['status']), ('Pulse', 'Fixture', 'ready'))
+        self.assertEqual(again['path'], row['path'])
 
     def test_review_corrections_keep_quality_duration_and_path_safeguards(self):
         path = self.audio(name='Fixture - Pulse.mp3', bitrate=128)
@@ -271,6 +273,40 @@ class PipelineTests(unittest.TestCase):
         result = crate.correct_import(self.root, self.job['id'], 0, 'Fixture', 'Pulse')
         self.assertEqual(result['tracks'][0]['status'], 'ready')
         self.assertTrue(Path(result['tracks'][0]['path']).is_file())
+
+    def test_confirmed_review_skips_identity_and_duration_but_not_quality(self):
+        path = self.audio()
+        row = self.job['tracks'][0]
+        row.update(status='review', path=str(path), length=20)
+        crate.save_job(self.root, self.job)
+        result = crate.correct_import(self.root, self.job['id'], 0, 'Someone', 'Else', confirm=True)
+        row = result['tracks'][0]
+        self.assertEqual(row['status'], 'ready')
+        self.assertEqual(row['note'], 'Confirmed by you and organized')
+        self.assertTrue(row['verification']['user_confirmed'])
+        self.assertEqual((row['artist'], row['title']), ('Someone', 'Else'))
+        low = self.audio(name='Fixture - Pulse.mp3', bitrate=128)
+        with self.assertRaisesRegex(ValueError, 'below 320'):
+            crate.verify(low, self.job['tracks'][0], 320, confirmed=True)
+
+    def test_confirm_all_files_awaiting_review(self):
+        job = crate.create_job(self.root, 'Artist,Title\nA,One\nB,Two\nC,Three\n', 'Batch', 'artist-title', 320)
+        staging = self.root/'downloads/.incoming'/job['id']
+        staging.mkdir(parents=True)
+        good = self.audio(name='one.flac', title='Wrong tag').rename(staging/'one.flac')
+        low = self.audio(name='two.mp3', bitrate=128).rename(staging/'two.mp3')
+        job['tracks'][0].update(status='review', path=str(good))
+        job['tracks'][1].update(status='review', path=str(low))
+        job['tracks'][2].update(status='unavailable', path='')
+        crate.save_job(self.root, job)
+        with patch.object(crate, 'managed_engine', side_effect=AssertionError('Must not download')):
+            result = crate.correct_import(self.root, job['id'], confirm_all=True)
+        statuses = [r['status'] for r in result['tracks']]
+        self.assertEqual(statuses, ['ready', 'review', 'unavailable'])
+        self.assertIn('below 320', result['tracks'][1]['note'])
+        self.assertTrue(low.exists())
+        with self.assertRaisesRegex(ValueError, 'No downloaded files'):
+            crate.correct_import(self.root, self.job['id'], confirm_all=True)
 
     def test_import_worker_with_fake_peer_reaches_real_sorter(self):
         path = self.audio()
