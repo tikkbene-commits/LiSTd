@@ -219,11 +219,16 @@ the ordinary organizer excludes that hidden staging area.
 Click an orange **Review** badge (or **… → Review file**) to see the file’s tags,
 filename, codec, duration and reason for rejection. **Listen to file** previews it;
 **Show in Finder** reveals the staged file. Correct the expected artist/title if the
-tracklist was wrong, then **Save & recheck file**. This reruns all identity, duration,
-bitrate and decode checks; it does not bypass quality requirements or edit file tags.
+tracklist was wrong, then **Save & recheck**. This reruns all identity, duration,
+bitrate and decode checks. If you have listened and the file is right, **Confirm file**
+accepts it on your word: tag and duration checks are skipped, but bitrate and a complete
+decode are still required. Neither edits file tags.
+
+**Import actions → Confirm all files to review** confirms every downloaded file awaiting
+review in that import at once (after a confirmation prompt).
 
 If an entire import has artist and title reversed, use **Swap artist / title & recheck**
-before any tracks have been accepted. It corrects the search fields and checks the
+(available at any time). It corrects the search fields and checks the
 already-downloaded review files locally. Original source text/CSV fields are retained.
 Neither review action downloads anything. **Retry unfinished** starts a new search
 for the remaining tracks using the corrected order.

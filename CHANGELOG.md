@@ -801,3 +801,20 @@ rather than reconstruct every past chat message.
   returned without errors or ban signs.
 - Validation: 45 unit tests passed (5 new in `tests/test_parallel_import.py`). No live
   download or full in-app import was run.
+
+## 2026-11-25 — Review: confirm files, confirm all, swap any time
+
+- Problem: reversed imports (e.g. ogazon set, 14 review files) could not be fixed in bulk
+  because **Swap artist / title & recheck** disappeared once any track was accepted, and
+  the review panel's only action re-ran the same strict tag checks, so a file the user
+  had listened to could never be accepted.
+- Review panel: **Save & recheck** (strict, unchanged) plus a new **Confirm file** that
+  accepts identity on the user's word; codec, measured bitrate and full decode still
+  apply. The swap button now uses a plain temporary swap.
+- Import actions: new **Confirm all files to review (N)…** with a confirmation dialog
+  (`confirm-reviews` backend command). Swap is available at any time; accepted rows are
+  relabelled only.
+- Validation: 47 unit tests passed (2 new, 1 updated for the swap change). `./build-crate`
+  succeeded. On a scratch copy of the ogazon job, swap filed all 14 review files and a
+  single `review-track` recheck returned valid JSON. The real library/job was not
+  modified. In-app clicking was not tested by the agent.

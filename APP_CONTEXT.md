@@ -340,11 +340,19 @@ Follow all credential, quality and protected-folder rules in `AGENTS.md`.
 Review status badges and row menus open a panel showing the file’s tags, filename,
 codec, duration and rejection reason, with an independent listening preview and
 Finder reveal. Expected artist/title fields can be corrected or swapped, then
-**Save & recheck file** reruns the normal identity, supplied-duration, measured-quality
-and full-decode checks. It does not override those checks or rewrite tags.
+**Save & recheck** reruns the normal identity, supplied-duration, measured-quality
+and full-decode checks. **Confirm file** (`review-track --confirm`) is the user's
+explicit acceptance after listening: it skips only the tag/filename identity and
+supplied-duration checks; codec, measured bitrate and full decode still apply, and the
+hook outcome records `user_confirmed: true`. Neither rewrites tags.
 
-Before any tracks are accepted, **Swap artist / title & recheck** corrects the entire
-import and checks the staged review files locally. The original source text and each
+**Import actions → Confirm all files to review** (`confirm-reviews ID`, behind a
+confirmation dialog) does the same for every review row with a staged file. Rows without
+a file (not found / candidate lists) are untouched; files failing quality stay in review.
+
+**Swap artist / title & recheck** corrects the entire import at any time (it used to be
+blocked once a track was accepted). Accepted rows are relabelled only; their files stay
+put. It then checks the staged review files locally. The original source text and each
 row’s `original` fields remain intact; `input.csv` receives the corrected search
 fields while preserving duration/extra columns. Accepted files move through the
 existing organizer; job paths, hook outcomes and owned indexes update together.
