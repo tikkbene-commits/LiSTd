@@ -37,6 +37,7 @@ struct ImportJob: Decodable, Identifiable, Equatable {
     let tracks: [Track]
     var ready: Int { tracks.filter { ["ready", "existing"].contains($0.status) }.count }
     var attention: Int { tracks.filter { ["unavailable", "review", "stopped"].contains($0.status) }.count }
+    var reviewFiles: Int { tracks.filter { $0.status == "review" && !$0.path.isEmpty }.count }
 }
 
 struct Snapshot: Decodable {
@@ -392,6 +393,7 @@ struct CrateView: View {
     @State private var collectionGroup = ""
     @State private var collectionSort = "Track title"
     @State private var folderJobID: String?
+    @State private var confirmAllJob: ImportJob?
     let timer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     var selectedJob: ImportJob? { model.jobs.first { $0.id == model.selection } }
@@ -819,9 +821,9 @@ struct CrateView: View {
                         Button(job.status == "queued" ? "Download & organize" : "Retry unfinished") { model.start(job.id) }
                         Button("Deep search all missing") { model.start(job.id, deep: true) }
                             .disabled(!job.tracks.contains { ["unavailable", "stopped", "review"].contains($0.status) && $0.path.isEmpty })
-                        if job.ready == 0 {
-                            Button("Swap artist / title & recheck") { model.correctImport(["swap-order", job.id]) }
-                        }
+                        Button("Swap artist / title & recheck") { model.correctImport(["swap-order", job.id]) }
+                        Button("Confirm all files to review (\(job.reviewFiles))…") { confirmAllJob = job }
+                            .disabled(job.reviewFiles == 0)
                         Button("Show new folders") { folderJobID = job.id; model.selection = "folders" }
                         if let url = URL(string: job.source), !job.source.isEmpty { Link("View source set", destination: url) }
                     }.disabled(model.working || model.jobs.contains { $0.status == "running" })
@@ -882,6 +884,12 @@ struct CrateView: View {
                     }
                 }.padding(.vertical, 6)
             }.listStyle(.inset)
+        }
+        .confirmationDialog("Confirm all files to review?", isPresented: Binding(get: { confirmAllJob != nil }, set: { if !$0 { confirmAllJob = nil } }), presenting: confirmAllJob) { job in
+            Button("Confirm \(job.reviewFiles) files") { model.correctImport(["confirm-reviews", job.id]) }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("Use this after you have listened to them. The current artist and title are kept and the tag and duration checks are skipped. Files below the selected bitrate or that fail to decode still stay in review.")
         }
     }
 
@@ -1006,29 +1014,18 @@ struct TrackReviewPanel: View {
                 TextField("Expected artist", text: $artist)
                 TextField("Expected title", text: $title)
             }.textFieldStyle(.roundedBorder)
-            Button("Swap artist / title") { swap(&artist, &title) }
-            Text("Correct the expected track if the list was reversed. Recheck still requires matching identity, duration, quality and a complete audio decode before filing the track. File tags stay unchanged.")
+            Button("Swap artist / title") { let previous = artist; artist = title; title = previous }
+            Text("Recheck files the track only if its tags match the artist and title above. Confirm files it on your word after listening, but quality and a complete decode are still required. File tags stay unchanged.")
                 .font(.caption).foregroundStyle(.secondary)
             if let error = preview.error { Text(error).foregroundStyle(.orange) }
             HStack {
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
                 Spacer()
-                Button(busy ? "Checking…" : "Save & recheck file") {
-                    preview.stop()
-                    busy = true
-                    model.working = true
-                    model.request(["review-track", review.jobID, String(review.track.index), "--artist", artist, "--title", title]) { result in
-                        busy = false
-                        model.working = false
-                        do {
-                            let job = try JSONDecoder().decode(ImportJob.self, from: result.get())
-                            note = job.tracks[review.track.index].note
-                            model.refresh()
-                            if job.tracks[review.track.index].status == "ready" { dismiss() }
-                        } catch { note = error.localizedDescription }
-                    }
-                }.buttonStyle(.borderedProminent)
-                    .disabled(info == nil || busy || model.working || model.jobs.contains { $0.status == "running" } || artist.trimmingCharacters(in: .whitespaces).isEmpty || title.trimmingCharacters(in: .whitespaces).isEmpty)
+                Button("Save & recheck") { submit(confirm: false) }
+                    .disabled(!canSubmit)
+                Button(busy ? "Checking…" : "Confirm file") { submit(confirm: true) }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!canSubmit)
             }
         }.padding(28).frame(width: 520).disabled(busy)
         .onAppear {
@@ -1039,6 +1036,30 @@ struct TrackReviewPanel: View {
             }
         }
         .onDisappear { preview.stop() }
+    }
+
+    var canSubmit: Bool {
+        info != nil && !busy && !model.working && !model.jobs.contains { $0.status == "running" }
+            && !artist.trimmingCharacters(in: .whitespaces).isEmpty && !title.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    func submit(confirm: Bool) {
+        preview.stop()
+        busy = true
+        model.working = true
+        var arguments = ["review-track", review.jobID, String(review.track.index), "--artist", artist, "--title", title]
+        if confirm { arguments.append("--confirm") }
+        model.request(arguments) { result in
+            busy = false
+            model.working = false
+            model.refresh()
+            do {
+                let job = try JSONDecoder().decode(ImportJob.self, from: result.get())
+                guard let row = job.tracks.first(where: { $0.index == review.track.index }) else { return }
+                note = row.note
+                if ["ready", "existing"].contains(row.status) { dismiss() }
+            } catch { note = error.localizedDescription }
+        }
     }
 }
 
