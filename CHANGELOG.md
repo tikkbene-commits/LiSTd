@@ -5,6 +5,29 @@ decisions, validation performed and any checks skipped. Keep this history factua
 the initial entries below summarize retained source, local records and this session,
 rather than reconstruct every past chat message.
 
+## 2026-11-25 — Limehead · Mix: traced face, jaw, wings and speakers; old-Windows visualiser
+
+- User feedback: the face looked sad not strict, the visualiser should look like the
+  old Windows one, the speakers should face outward, and every line of the face and
+  the jaw outline should be copied exactly.
+- New `scripts/trace_limehead.py` traces the reference screenshot into
+  `native/LimeheadTrace.swift`: full head outline (dome, sides, jaw), 31 green
+  brightness layers for head and face (app controls painted out first), the screen
+  outline, both wings (stripes and X marks kept) and six speakers (26 grey layers each,
+  ellipse rims fitted to the traced edge, rms 0.6 px; tilts 56°/49°/45°). Measurements
+  found the reference head centred at x ≈ 464 and ~17 px wider than the hand-drawn one,
+  and the screen's top edge at y ≈ 90 under the pill; geometry now uses those values.
+  Pill, pill buttons (r 10), panels and the drawer icon were re-measured. Drop shadows
+  removed (the reference has none). `LimeArtwork` is `Equatable` so the detailed paths
+  redraw only when a wing toggles or the size changes.
+- Visualiser rebuilt as an oscilloscope: jagged white traces across and down from raw
+  samples (`AudioSpectrum.wave`, new), zooming red trails, centre hot spot; clipped
+  out of the pill.
+- Validation: `check_limehead` (landmark colours re-checked against the reference
+  pixels), spectrum, player, skin and Cyber checks passed; `./build-crate` built both
+  architectures. Offscreen renders compared side by side with the reference at 2–4×.
+  The rebuilt app was not relaunched: an import was running in the open copy.
+
 ## 2026-11-25 — Limehead · Mix skin
 
 - New skin recreating the supplied green head media-player screenshot as vector

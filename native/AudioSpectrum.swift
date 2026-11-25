@@ -10,6 +10,15 @@ final class AudioSpectrum: @unchecked Sendable {
     private let window = (0..<size).map { Float(0.5 - 0.5 * cos(2 * .pi * Double($0) / Double(size - 1))) }
     private let lock = NSLock()
     private var snapshot = Array(repeating: Float(0), count: bands)
+    /// Raw samples spread across one analysis window, for oscilloscope-style displays.
+    static let wavePoints = 96
+    private var waveSnapshot = Array(repeating: Float(0), count: wavePoints)
+
+    var wave: [Float] {
+        lock.lock()
+        defer { lock.unlock() }
+        return waveSnapshot
+    }
 
     var levels: [Float] {
         lock.lock()
@@ -37,8 +46,10 @@ final class AudioSpectrum: @unchecked Sendable {
             let peak = magnitudes[low..<upper].max() ?? 0
             return min(1, max(0, (20 * log10(max(peak, 0.000001)) + 65) / 65))
         }
+        let wave = (0..<Self.wavePoints).map { channels[channel][$0 * Self.size / Self.wavePoints] }
         lock.lock()
         snapshot = values
+        waveSnapshot = wave
         lock.unlock()
     }
 }

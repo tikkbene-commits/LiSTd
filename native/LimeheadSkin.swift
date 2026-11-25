@@ -2,85 +2,43 @@ import SwiftUI
 import AppKit
 
 // Limehead · Mix recreates the supplied green "head" media-player reference: a lime head
-// with a red visualiser screen, flanked by two speaker wings. It is drawn in the
-// reference crop's own 935 × 498 pixel space, and every control uses the same
-// coordinates. The left wing is a two-deck mixer (crossfader, master and per-deck
-// level/pitch/EQ faders); the right wing lists the collection pane's visible tracks.
+// with a red visualiser screen, flanked by two speaker wings. The head, face, screen
+// outline, wings and speakers are traced from the reference by scripts/trace_limehead.py
+// into `LimeTrace` (native/LimeheadTrace.swift), in the reference crop's own pixel space;
+// every control here uses the same coordinates. The left wing is a two-deck mixer
+// (crossfader, master and per-deck level/pitch/EQ faders); the right wing lists the
+// collection pane's visible tracks.
 enum LimeGeometry {
     static let width: CGFloat = 935
     static let height: CGFloat = 498
 
     static func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x, y: y) }
 
-    /// Closed Catmull-Rom curve through traced points.
-    static func closed(_ points: [CGPoint]) -> Path {
-        var path = Path()
-        let n = points.count
-        guard n > 2 else { return path }
-        path.move(to: points[0])
-        for i in 0..<n {
-            let p0 = points[(i - 1 + n) % n], p1 = points[i], p2 = points[(i + 1) % n], p3 = points[(i + 2) % n]
-            path.addCurve(to: p2,
-                          control1: CGPoint(x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6),
-                          control2: CGPoint(x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6))
-        }
-        path.closeSubpath()
-        return path
-    }
+    // MARK: Head and screen, traced.
+    static let head = LimeTracedShape.path(LimeTrace.head.outline)
+    static let screen = LimeTracedShape.path(LimeTrace.screen)
+    /// The part of the screen below the title pill, where the visualiser is laid out.
+    static let screenView = CGRect(x: 338, y: 114, width: 256, height: 156)
 
-    static let mirror = CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: width, ty: 0)
-
-    // MARK: Head — traced from the reference, symmetric about x = 470.
-    static let head = closed([p(470, 8), p(502, 10), p(531, 18), p(556, 32), p(576, 50), p(590, 72), p(598, 98),
-        p(602, 130), p(603, 170), p(603, 250), p(602, 290), p(598, 320), p(592, 345), p(583, 370), p(571, 396),
-        p(557, 421), p(540, 445), p(520, 467), p(500, 482), p(480, 489), p(460, 489), p(440, 482), p(420, 467),
-        p(400, 445), p(383, 421), p(369, 396), p(357, 370), p(348, 345), p(342, 320), p(338, 290), p(337, 250),
-        p(337, 170), p(338, 130), p(342, 98), p(350, 72), p(364, 50), p(384, 32), p(409, 18), p(438, 10)])
-
-    static let screen: Path = {
-        var path = Path()
-        path.move(to: p(343, 118))
-        path.addQuadCurve(to: p(357, 104), control: p(343, 104))
-        path.addLine(to: p(583, 104))
-        path.addQuadCurve(to: p(597, 118), control: p(597, 104))
-        path.addLine(to: p(597, 236))
-        path.addCurve(to: p(470, 274), control1: p(594, 262), control2: p(540, 274))
-        path.addCurve(to: p(343, 236), control1: p(400, 274), control2: p(346, 262))
-        path.closeSubpath()
-        return path
-    }()
-
-    static let pill = CGRect(x: 362, y: 88, width: 210, height: 22)
-    static let titleText = CGRect(x: 394, y: 89, width: 132, height: 20)
+    /// Title pill, measured: it sits on the screen's top edge.
+    static let pill = CGRect(x: 359.5, y: 85, width: 212, height: 26.5)
+    static let titleText = CGRect(x: 394, y: 88.5, width: 132, height: 20)
 
     // Head controls (centres).
     static let minimize = p(452, 22), close = p(471, 22)
     static let previous = p(395, 62), playPause = p(426, 62), stop = p(458, 62), next = p(488, 62)
     static let visualiser = p(539, 62)
-    static let focusA = p(382, 99), focusB = p(537, 99), openFile = p(558, 99)
-    static let mixerIcon = p(352, 284), listIcon = p(581, 284), drawerIcon = p(466, 309)
+    static let focusA = p(383, 98.5), focusB = p(537, 98.5), openFile = p(558, 98.5)
+    static let mixerIcon = p(352, 284), listIcon = p(581, 284), drawerIcon = p(467, 311)
     static let seekStart: CGFloat = 378, seekEnd: CGFloat = 559, seekY: CGFloat = 285
 
-    // MARK: Wings. The right wing is the left wing mirrored.
-    static let wingBody = Path(roundedRect: CGRect(x: 88, y: 114, width: 257, height: 194), cornerRadius: 16)
-    static let speakers: [(centre: CGPoint, radius: CGFloat)] = [(p(48, 162), 32), (p(70, 225), 30), (p(68, 283), 28)]
-    static let pod: Path = {
-        var path = Path()
-        for (centre, radius) in speakers {
-            let r = radius + 6
-            path.addEllipse(in: CGRect(x: centre.x - r, y: centre.y - r, width: r * 2, height: r * 2))
-        }
-        path.addRoundedRect(in: CGRect(x: 40, y: 116, width: 80, height: 198), cornerSize: CGSize(width: 30, height: 30))
-        return path
-    }()
-    static let tab = Path(ellipseIn: CGRect(x: 14, y: 193, width: 44, height: 86))
-    static let leftTabArrow = p(30, 236)
-    static let leftPanel = CGRect(x: 108, y: 126, width: 204, height: 169)
-    static let rightPanel = CGRect(x: 613, y: 126, width: 209, height: 169)
-    static let leftWingClose = p(99, 128), rightWingClose = p(836, 128)
+    // MARK: Wings (traced). Panel interiors, measured, are drawn by the app.
+    static let leftPanel = CGRect(x: 107.5, y: 125.5, width: 202.5, height: 170)
+    static let rightPanel = CGRect(x: 613.5, y: 126.5, width: 208.5, height: 169)
+    static let leftWingClose = p(99.5, 128), rightWingClose = p(833, 128)
     /// Small tabs on the head's edge that reopen a closed wing.
-    static let leftHeadTab = Path(ellipseIn: CGRect(x: 324, y: 200, width: 24, height: 72))
-    static let rightHeadTab = Path(ellipseIn: CGRect(x: 592, y: 200, width: 24, height: 72))
+    static let leftHeadTab = Path(ellipseIn: CGRect(x: 311, y: 200, width: 26, height: 72))
+    static let rightHeadTab = Path(ellipseIn: CGRect(x: 591, y: 200, width: 26, height: 72))
 
     // MARK: Mixer layout (left panel)
     static let crossfade = (from: p(125, 144), to: p(198, 144))
@@ -135,6 +93,53 @@ enum LimePalette {
     static let rowText = Color(hex: 0xf0f6ea)
 }
 
+// MARK: - Traced artwork
+
+/// A shape from `LimeTrace`, parsed once: its outline, the colour under its layers, and its
+/// brightness layers (darkest first), each filled even-odd and clipped to the outline.
+struct LimeTracedShape {
+    let outline: Path
+    let base: Color
+    let layers: [(colour: Color, path: Path)]
+
+    init(_ shape: LimeTrace.Shape) {
+        outline = Self.path(shape.outline)
+        base = Color(hex: shape.base)
+        layers = shape.layers.map { (Color(hex: $0.colour), Self.path($0.outlines)) }
+    }
+
+    /// Closed polygons from "x,y x,y|x,y ...".
+    static func path(_ text: String) -> Path {
+        var path = Path()
+        for loop in text.split(separator: "|") {
+            var started = false
+            for pair in loop.split(separator: " ") {
+                guard let comma = pair.firstIndex(of: ","), let x = Double(pair[..<comma]),
+                      let y = Double(pair[pair.index(after: comma)...]) else { continue }
+                if started { path.addLine(to: CGPoint(x: x, y: y)) } else { path.move(to: CGPoint(x: x, y: y)); started = true }
+            }
+            if started { path.closeSubpath() }
+        }
+        return path
+    }
+
+    func draw(in context: inout GraphicsContext) {
+        context.drawLayer { layer in
+            layer.clip(to: outline)
+            layer.fill(outline, with: .color(base))
+            for shade in layers { layer.fill(shade.path, with: .color(shade.colour), style: FillStyle(eoFill: true)) }
+        }
+    }
+}
+
+enum LimeArt {
+    static let head = LimeTracedShape(LimeTrace.head)
+    static let leftWing = LimeTracedShape(LimeTrace.leftWing)
+    static let rightWing = LimeTracedShape(LimeTrace.rightWing)
+    static let leftSpeakers = LimeTrace.leftSpeakers.map(LimeTracedShape.init)
+    static let rightSpeakers = LimeTrace.rightSpeakers.map(LimeTracedShape.init)
+}
+
 // MARK: - Mixer model
 
 /// Two-deck mix: each deck's output = master × deck level × constant-power crossfade gain.
@@ -174,7 +179,8 @@ enum LimePalette {
 
 // MARK: - Artwork
 
-struct LimeArtwork: View {
+/// Redraws only when a wing opens or closes (the traced paths are detailed).
+struct LimeArtwork: View, Equatable {
     var leftOpen = true
     var rightOpen = true
     var body: some View {
@@ -194,83 +200,19 @@ struct LimeArtwork: View {
     static func line(_ points: [CGPoint]) -> Path { var path = Path(); path.addLines(points); return path }
 
     static func draw(in context: inout GraphicsContext, leftOpen: Bool, rightOpen: Bool) {
-        if leftOpen { context.drawLayer { drawWing(in: &$0) } } else { drawHeadTab(in: &context, G.leftHeadTab, pointingRight: false) }
-        if rightOpen { context.drawLayer { $0.concatenate(G.mirror); drawWing(in: &$0) } } else { drawHeadTab(in: &context, G.rightHeadTab, pointingRight: true) }
+        if leftOpen {
+            LimeArt.leftWing.draw(in: &context)
+            for speaker in LimeArt.leftSpeakers { speaker.draw(in: &context) }
+        } else { drawHeadTab(in: &context, G.leftHeadTab, pointingRight: false) }
+        if rightOpen {
+            LimeArt.rightWing.draw(in: &context)
+            for speaker in LimeArt.rightSpeakers { speaker.draw(in: &context) }
+        } else { drawHeadTab(in: &context, G.rightHeadTab, pointingRight: true) }
         if leftOpen { drawPanel(in: &context, G.leftPanel); drawMixerTracks(in: &context) }
         if rightOpen { drawPanel(in: &context, G.rightPanel) }
-        drawHead(in: &context)
+        LimeArt.head.draw(in: &context)
         drawScreen(in: &context)
         drawHeadControls(in: &context)
-    }
-
-    // MARK: Wings
-
-    static func drawWing(in context: inout GraphicsContext) {
-        // The ribbed tab peeking out behind the speaker pod.
-        context.fill(G.tab, with: .linearGradient(Gradient(colors: [P.bevel, Color(hex: 0x4da517), P.shade]),
-                                                  startPoint: G.p(14, 0), endPoint: G.p(58, 0)))
-        context.drawLayer { layer in
-            layer.clip(to: G.tab)
-            var y: CGFloat = 196
-            while y < 280 { layer.stroke(line([G.p(10, y), G.p(60, y)]), with: .color(P.dark.opacity(0.55)), lineWidth: 0.8); y += 3 }
-        }
-        context.stroke(G.tab, with: .color(P.dark.opacity(0.7)), lineWidth: 1)
-        var arrow = Path()
-        arrow.move(to: G.p(26, 229)); arrow.addLine(to: G.p(34, 236)); arrow.addLine(to: G.p(26, 243)); arrow.closeSubpath()
-        context.fill(arrow, with: .color(Color(hex: 0xc9ff7a)))
-        context.stroke(arrow, with: .color(P.dark), lineWidth: 0.8)
-
-        // Shadow, body and pod.
-        context.drawLayer { layer in
-            layer.addFilter(.blur(radius: 4))
-            layer.translateBy(x: 2, y: 4)
-            layer.fill(G.wingBody, with: .color(.black.opacity(0.35)))
-            layer.fill(G.pod, with: .color(.black.opacity(0.35)))
-        }
-        context.fill(G.wingBody, with: .linearGradient(Gradient(stops: [
-            .init(color: Color(hex: 0xc4f27a), location: 0), .init(color: P.bevel, location: 0.04),
-            .init(color: P.limeBright, location: 0.09), .init(color: P.limeMid, location: 0.5),
-            .init(color: P.shade, location: 0.86), .init(color: Color(hex: 0x1d6a05), location: 1)]),
-            startPoint: G.p(0, 114), endPoint: G.p(0, 308)))
-        context.stroke(G.wingBody, with: .color(P.dark.opacity(0.8)), lineWidth: 1)
-        context.fill(G.pod, with: .linearGradient(Gradient(stops: [
-            .init(color: P.bevel, location: 0), .init(color: P.limeBright, location: 0.3),
-            .init(color: Color(hex: 0x54a107), location: 0.72), .init(color: P.shade, location: 1)]),
-            startPoint: G.p(8, 0), endPoint: G.p(124, 0)))
-        // Rim light along the pod's left edge.
-        context.drawLayer { layer in
-            layer.clip(to: G.pod)
-            layer.addFilter(.blur(radius: 2.5))
-            var lit = G.pod
-            lit = lit.offsetBy(dx: 4, dy: 3)
-            layer.stroke(lit, with: .color(Color(hex: 0xd2ff8c).opacity(0.55)), lineWidth: 3)
-        }
-        for (centre, radius) in G.speakers { drawSpeaker(in: &context, centre, radius) }
-        // Wing close mark.
-        let c = G.leftWingClose
-        context.stroke(line([G.p(c.x - 4, c.y - 4), G.p(c.x + 4, c.y + 4)]), with: .color(Color(hex: 0x1f4a05)), lineWidth: 2.2)
-        context.stroke(line([G.p(c.x + 4, c.y - 4), G.p(c.x - 4, c.y + 4)]), with: .color(Color(hex: 0x1f4a05)), lineWidth: 2.2)
-    }
-
-    static func drawSpeaker(in context: inout GraphicsContext, _ c: CGPoint, _ r: CGFloat) {
-        context.drawLayer { layer in
-            layer.addFilter(.blur(radius: 2.5))
-            layer.fill(circle(G.p(c.x + 1.5, c.y + 2.5), r + 1), with: .color(.black.opacity(0.4)))
-        }
-        context.fill(circle(c, r), with: .radialGradient(Gradient(colors: [Color(hex: 0xf4f6f7), Color(hex: 0xb9bcbf), Color(hex: 0x6d7176)]),
-                                                         center: G.p(c.x - r * 0.3, c.y - r * 0.4), startRadius: 0, endRadius: r * 1.4))
-        context.stroke(circle(c, r), with: .color(Color(hex: 0x4c5055)), lineWidth: 1)
-        context.fill(circle(c, r * 0.84), with: .color(Color(hex: 0x1e2126)))
-        context.stroke(circle(c, r * 0.74), with: .color(Color(hex: 0x4a4f57)), lineWidth: 0.8)
-        context.fill(circle(c, r * 0.54), with: .radialGradient(Gradient(colors: [Color(hex: 0xf6f3f0), Color(hex: 0xc9c1ba), Color(hex: 0x8a837d)]),
-                                                                center: G.p(c.x - r * 0.2, c.y - r * 0.25), startRadius: 0, endRadius: r * 0.65))
-        context.stroke(circle(c, r * 0.38), with: .color(Color(hex: 0x8a837d).opacity(0.6)), lineWidth: 1)
-        context.fill(circle(c, r * 0.22), with: .radialGradient(Gradient(colors: [.white, Color(hex: 0xbdb5ae)]),
-                                                                center: G.p(c.x - r * 0.07, c.y - r * 0.08), startRadius: 0, endRadius: r * 0.25))
-        for angle in stride(from: 45.0, to: 360, by: 90) {
-            let a = angle * .pi / 180
-            context.fill(circle(G.p(c.x + cos(a) * r * 0.89, c.y + sin(a) * r * 0.89), 1.6), with: .color(Color(hex: 0x3a3e44)))
-        }
     }
 
     static func drawHeadTab(in context: inout GraphicsContext, _ tab: Path, pointingRight: Bool) {
@@ -280,8 +222,7 @@ struct LimeArtwork: View {
     }
 
     static func drawPanel(in context: inout GraphicsContext, _ rect: CGRect) {
-        let shape = Path(roundedRect: rect, cornerRadius: 4)
-        context.stroke(Path(roundedRect: rect.insetBy(dx: -2, dy: -2), cornerRadius: 6), with: .color(Color(hex: 0x1d6a05)), lineWidth: 2)
+        let shape = Path(roundedRect: rect, cornerRadius: 2)
         context.fill(shape, with: .color(P.panel))
         context.drawLayer { layer in
             layer.clip(to: shape)
@@ -322,97 +263,28 @@ struct LimeArtwork: View {
         context.stroke(line([G.p(210, 168), G.p(210, 282)]), with: .color(Color(hex: 0x4a9a10).opacity(0.35)), lineWidth: 1)
     }
 
-    // MARK: Head
-
-    static func drawHead(in context: inout GraphicsContext) {
-        context.drawLayer { layer in
-            layer.addFilter(.blur(radius: 6))
-            layer.translateBy(x: 3, y: 6)
-            layer.fill(G.head, with: .color(.black.opacity(0.35)))
-        }
-        context.fill(G.head, with: .linearGradient(Gradient(stops: [
-            .init(color: P.lime, location: 0), .init(color: Color(hex: 0x96f01a), location: 0.2),
-            .init(color: P.limeBright, location: 0.45), .init(color: Color(hex: 0x6ccb03), location: 0.62),
-            .init(color: Color(hex: 0x4a9f04), location: 0.85), .init(color: P.shade, location: 1)]),
-            startPoint: G.p(0, 8), endPoint: G.p(0, 489)))
-        context.drawLayer { layer in
-            layer.clip(to: G.head)
-            // Rounded sides.
-            layer.fill(G.head, with: .linearGradient(Gradient(stops: [
-                .init(color: P.dark.opacity(0.8), location: 0), .init(color: .clear, location: 0.2),
-                .init(color: .clear, location: 0.8), .init(color: P.dark.opacity(0.8), location: 1)]),
-                startPoint: G.p(337, 0), endPoint: G.p(603, 0)))
-            func soft(_ radius: CGFloat, _ draw: (inout GraphicsContext) -> Void) {
-                layer.drawLayer { inner in inner.addFilter(.blur(radius: radius)); draw(&inner) }
-            }
-            // Crown highlight.
-            soft(10) { $0.fill(ellipse(470, 36, 150, 44), with: .color(.white.opacity(0.32))) }
-            // Face: forehead, brow and deep eye sockets.
-            soft(5) { $0.fill(ellipse(470, 314, 214, 22), with: .color(P.lime.opacity(0.8))) }
-            soft(6) { $0.fill(ellipse(470, 332, 250, 28), with: .color(P.deep.opacity(0.85))) }
-            for side: CGFloat in [-1, 1] {
-                let x = 470 + side * 61
-                soft(6) { l in
-                    var socket = l
-                    socket.translateBy(x: x, y: 346); socket.rotate(by: .degrees(Double(side) * -8))
-                    socket.fill(ellipse(0, 0, 90, 42), with: .color(.black))
-                }
-                soft(3) { $0.fill(ellipse(x + side * -2, 348, 56, 22), with: .color(.black)) }
-                soft(2) { $0.fill(ellipse(x, 358, 42, 6), with: .color(Color(hex: 0x3c8c08).opacity(0.85))) }
-                // Cheekbones, nose sides and smile lines.
-                soft(8) { $0.fill(ellipse(470 + side * 82, 392, 42, 52), with: .color(Color(hex: 0x8ee02a).opacity(0.55))) }
-                soft(5) { $0.fill(ellipse(470 + side * 24, 395, 14, 62), with: .color(Color(hex: 0x0d4d02).opacity(0.6))) }
-                soft(2) { $0.fill(ellipse(470 + side * 17, 434, 14, 7), with: .color(.black.opacity(0.9))) }
-                soft(3) {
-                    var crease = Path()
-                    crease.move(to: G.p(470 + side * 30, 404))
-                    crease.addQuadCurve(to: G.p(470 + side * 52, 470), control: G.p(470 + side * 58, 436))
-                    $0.stroke(crease, with: .color(Color(hex: 0x021a00)), lineWidth: 7)
-                }
-                soft(8) {
-                    var jaw = Path()
-                    jaw.move(to: G.p(470 + side * 112, 360))
-                    jaw.addQuadCurve(to: G.p(470 + side * 70, 455), control: G.p(470 + side * 104, 420))
-                    $0.stroke(jaw, with: .color(Color(hex: 0x063300).opacity(0.9)), lineWidth: 14)
-                }
-            }
-            soft(5) { $0.fill(Path(roundedRect: CGRect(x: 458, y: 350, width: 24, height: 78), cornerRadius: 12), with: .color(Color(hex: 0xc4ff5a).opacity(0.8))) }
-            soft(3) { $0.fill(ellipse(470, 424, 30, 16), with: .color(Color(hex: 0xc4ff6a).opacity(0.6))) }
-            // Mouth and chin.
-            soft(2) { $0.fill(ellipse(470, 451, 40, 6), with: .color(Color(hex: 0x8ee02a).opacity(0.5))) }
-            // Shadow under the nose, then a soft dark mouth rather than a drawn line.
-            soft(5) { $0.fill(ellipse(470, 442, 70, 14), with: .color(Color(hex: 0x063300).opacity(0.75))) }
-            soft(3.5) { $0.fill(ellipse(470, 461, 86, 11), with: .color(.black.opacity(0.85))) }
-            soft(1.5) {
-                var mouth = Path()
-                mouth.move(to: G.p(436, 462)); mouth.addQuadCurve(to: G.p(504, 462), control: G.p(470, 458))
-                $0.stroke(mouth, with: .color(.black), lineWidth: 2.5)
-            }
-            soft(3) { $0.fill(ellipse(470, 472, 46, 8), with: .color(P.limeBright.opacity(0.6))) }
-            soft(4) { $0.fill(ellipse(470, 484, 60, 10), with: .color(P.dark.opacity(0.5))) }
-        }
-        context.stroke(G.head, with: .color(Color(hex: 0x2c6a04).opacity(0.8)), lineWidth: 1)
-    }
+    // MARK: Screen and controls
 
     static func drawScreen(in context: inout GraphicsContext) {
-        context.stroke(G.screen, with: .color(Color(hex: 0x8fe33a)), lineWidth: 5)
-        context.fill(G.screen, with: .radialGradient(Gradient(colors: [P.redHot, P.red, P.redDeep]),
-                                                     center: G.p(470, 190), startRadius: 0, endRadius: 165))
-        context.stroke(G.screen, with: .color(Color(hex: 0x2e7a03)), lineWidth: 1.2)
+        // The traced head carries the bezel; the screen is the dark red the visualiser glows on.
+        context.fill(G.screen, with: .radialGradient(Gradient(colors: [Color(hex: 0x8a0000), Color(hex: 0x5a0000), Color(hex: 0x2a0000)]),
+                                                     center: G.p(465, 185), startRadius: 0, endRadius: 165))
 
-        // Title pill and its buttons.
+        // Title pill (sampled colours, dark rim) and its buttons.
         let pill = Path(roundedRect: G.pill, cornerRadius: G.pill.height / 2)
-        context.drawLayer { layer in
-            layer.addFilter(.blur(radius: 2)); layer.translateBy(x: 0, y: 2)
-            layer.fill(pill, with: .color(.black.opacity(0.45)))
-        }
-        context.fill(pill, with: .linearGradient(Gradient(colors: [P.pillLight, P.pill, Color(hex: 0x3d9a05)]),
+        context.fill(pill, with: .linearGradient(Gradient(colors: [Color(hex: 0x6ad310), Color(hex: 0x5ec104), Color(hex: 0x4ec100), Color(hex: 0x3e9a00)]),
                                                  startPoint: G.p(0, G.pill.minY), endPoint: G.p(0, G.pill.maxY)))
-        context.stroke(pill, with: .color(Color(hex: 0x2e7a03)), lineWidth: 1)
-        roundButton(in: &context, G.focusA, 8, [Color(hex: 0xfff2a8), Color(hex: 0xe3b521), Color(hex: 0x9a6c08)], ring: Color(hex: 0x5a4006))
-        roundButton(in: &context, G.focusB, 8, [Color(hex: 0xd6f4ff), Color(hex: 0x3fa8e0), Color(hex: 0x145a8c)], ring: Color(hex: 0x0c3a5c))
-        var left = Path(); left.move(to: G.p(385, 94.5)); left.addLine(to: G.p(378.5, 99)); left.addLine(to: G.p(385, 103.5)); left.closeSubpath()
-        var right = Path(); right.move(to: G.p(534, 94.5)); right.addLine(to: G.p(540.5, 99)); right.addLine(to: G.p(534, 103.5)); right.closeSubpath()
+        context.drawLayer { scan in
+            scan.clip(to: pill)
+            var y = G.pill.minY + 1.5
+            while y < G.pill.maxY { scan.fill(Path(CGRect(x: G.pill.minX, y: y, width: G.pill.width, height: 0.8)), with: .color(Color(hex: 0x3d9900).opacity(0.18))); y += 2 }
+        }
+        context.stroke(pill, with: .color(Color(hex: 0x212b00)), lineWidth: 1)
+        roundButton(in: &context, G.focusA, 10, [Color(hex: 0xfff2a8), Color(hex: 0xe3b521), Color(hex: 0x9a6c08)], ring: Color(hex: 0x5a4006))
+        roundButton(in: &context, G.focusB, 10, [Color(hex: 0xd6f4ff), Color(hex: 0x3fa8e0), Color(hex: 0x145a8c)], ring: Color(hex: 0x0c3a5c))
+        let a = G.focusA, b = G.focusB
+        var left = Path(); left.move(to: G.p(a.x + 2.5, a.y - 5)); left.addLine(to: G.p(a.x - 4.5, a.y)); left.addLine(to: G.p(a.x + 2.5, a.y + 5)); left.closeSubpath()
+        var right = Path(); right.move(to: G.p(b.x - 2.5, b.y - 5)); right.addLine(to: G.p(b.x + 4.5, b.y)); right.addLine(to: G.p(b.x - 2.5, b.y + 5)); right.closeSubpath()
         context.fill(left, with: .color(Color(hex: 0x2a1c00)))
         context.fill(right, with: .color(Color(hex: 0x05182a)))
         let x = G.openFile
@@ -497,65 +369,117 @@ struct LimeArtwork: View {
         context.stroke(page, with: glyph, lineWidth: 1.2)
         for row in 0..<4 { context.fill(Path(CGRect(x: d.x - 3.5, y: d.y - 3.5 + CGFloat(row) * 2.8, width: 7, height: 1)), with: glyph) }
         let w = G.drawerIcon
-        let back = Path(roundedRect: CGRect(x: w.x - 9, y: w.y - 9, width: 11, height: 11), cornerRadius: 1.5)
-        let front = Path(roundedRect: CGRect(x: w.x - 2, y: w.y - 2, width: 11, height: 11), cornerRadius: 1.5)
-        context.fill(back, with: .color(Color(hex: 0xd2ff8a).opacity(0.7))); context.stroke(back, with: glyph, lineWidth: 1.3)
-        context.fill(front, with: .color(Color(hex: 0xd2ff8a))); context.stroke(front, with: glyph, lineWidth: 1.3)
-        context.stroke(line([G.p(w.x - 6, w.y - 6), G.p(w.x + 4, w.y + 4)]), with: glyph, lineWidth: 1.3)
-        context.stroke(line([G.p(w.x + 4, w.y), G.p(w.x + 4, w.y + 4), G.p(w.x, w.y + 4)]), with: glyph, lineWidth: 1.3)
+        let back = Path(roundedRect: CGRect(x: w.x - 12, y: w.y - 12, width: 14, height: 14), cornerRadius: 2)
+        let front = Path(roundedRect: CGRect(x: w.x - 2, y: w.y - 2, width: 14, height: 14), cornerRadius: 2)
+        context.fill(back, with: .color(Color(hex: 0xd2ff8a).opacity(0.7))); context.stroke(back, with: glyph, lineWidth: 1.5)
+        context.fill(front, with: .color(Color(hex: 0xd2ff8a))); context.stroke(front, with: glyph, lineWidth: 1.5)
+        context.stroke(line([G.p(w.x - 8, w.y - 8), G.p(w.x + 5, w.y + 5)]), with: glyph, lineWidth: 1.5)
+        context.stroke(line([G.p(w.x + 5, w.y), G.p(w.x + 5, w.y + 5), G.p(w.x, w.y + 5)]), with: glyph, lineWidth: 1.5)
     }
 }
 
 // MARK: - Red visualiser
 
-/// Glowing red bands with a white trace, after the reference's screen. Reads the focused
-/// deck's live spectrum; still under Reduce Motion or when paused.
+/// Recent waveforms, newest last, for the smeared trails.
+final class LimeTrails {
+    private(set) var frames: [[Float]] = []
+    private var last = Date.distantPast
+    func push(_ wave: [Float], at date: Date) {
+        guard date.timeIntervalSince(last) >= 1.0 / 40 else { return }
+        last = date
+        frames.append(wave)
+        if frames.count > 12 { frames.removeFirst() }
+    }
+}
+
+/// An old-Windows style visualiser after the reference screen: a jagged white
+/// oscilloscope line across the screen and another down the middle, red glowing trails
+/// that zoom outward behind them, and a hot spot in the centre that swells with the
+/// music. Reads the focused deck's live audio; still under Reduce Motion or when paused.
 struct LimeVisualiser: View {
     let analyzer: AudioSpectrum
     let playing: Bool
+    @State private var trails = LimeTrails()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !playing || reduceMotion)) { _ in
-            let levels = playing ? analyzer.levels : Array(repeating: Float(0), count: AudioSpectrum.bands)
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !playing || reduceMotion)) { timeline in
             Canvas { context, size in
+                trails.push(playing ? analyzer.wave : Array(repeating: 0, count: AudioSpectrum.wavePoints), at: timeline.date)
+                let levels = playing ? analyzer.levels : []
+                let energy = levels.isEmpty ? 0 : CGFloat(levels.reduce(0, +) / Float(levels.count))
                 let s = size.width / LimeGeometry.width
                 context.scaleBy(x: s, y: s)
                 context.clip(to: LimeGeometry.screen)
-                let box = LimeGeometry.screen.boundingRect.insetBy(dx: 6, dy: 4)
-                let mid = box.midY + 4
-                let step = box.width / CGFloat(max(1, levels.count - 1))
-                context.drawLayer { glow in
-                    glow.addFilter(.blur(radius: 7))
-                    for (index, level) in levels.enumerated() {
-                        let h = CGFloat(level) * box.height * 0.9
-                        glow.fill(Path(CGRect(x: box.minX + CGFloat(index) * step - step * 0.45, y: mid - h / 2, width: step * 0.9, height: h)),
-                                  with: .color(Color(hex: 0xff2a2a).opacity(0.75)))
-                    }
-                }
-                context.drawLayer { core in
-                    core.addFilter(.blur(radius: 1.5))
-                    for (index, level) in levels.enumerated() {
-                        let h = CGFloat(level) * box.height * 0.6
-                        core.fill(Path(CGRect(x: box.minX + CGFloat(index) * step - 1.2, y: mid - h / 2, width: 2.4, height: h)),
-                                  with: .color(Color(hex: 0xff9a9a).opacity(0.8)))
-                    }
-                }
-                var trace = Path()
-                for (index, level) in levels.enumerated() {
-                    let sign: CGFloat = index.isMultiple(of: 2) ? -1 : 1
-                    let point = CGPoint(x: box.minX + CGFloat(index) * step, y: mid + sign * CGFloat(level) * box.height * 0.42)
-                    if index == 0 { trace.move(to: point) } else { trace.addLine(to: point) }
-                }
-                context.drawLayer { halo in
-                    halo.addFilter(.blur(radius: 2))
-                    halo.stroke(trace, with: .color(Color(hex: 0xffd0d0).opacity(0.7)), lineWidth: 2.5)
-                }
-                context.stroke(trace, with: .color(.white.opacity(0.95)), lineWidth: 1)
+                context.clip(to: Path(roundedRect: LimeGeometry.pill, cornerRadius: LimeGeometry.pill.height / 2), options: .inverse)
+                let box = LimeGeometry.screenView
+                let c = CGPoint(x: box.midX, y: box.midY - 4)
+                LimeVisualiser.draw(in: &context, frames: trails.frames, energy: energy, box: box, centre: c)
             }
         }
         .allowsHitTesting(false)
         .accessibilityLabel(playing ? "Live audio visualiser" : "Audio visualiser paused")
+    }
+
+    /// Jagged polylines through the raw samples, like the original oscilloscope.
+    static func across(_ wave: [Float], _ box: CGRect, _ c: CGPoint) -> Path {
+        var path = Path()
+        guard wave.count > 1 else { return path }
+        for (index, sample) in wave.enumerated() {
+            let x = box.minX + box.width * CGFloat(index) / CGFloat(wave.count - 1)
+            let y = min(box.maxY, max(box.minY, c.y + CGFloat(sample) * box.height * 0.5))
+            if index == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.addLine(to: CGPoint(x: x, y: y)) }
+        }
+        return path
+    }
+
+    static func down(_ wave: [Float], _ box: CGRect, _ c: CGPoint) -> Path {
+        var path = Path()
+        guard wave.count > 1 else { return path }
+        let n = wave.count
+        for index in 0..<n {
+            let sample = wave[(index + n / 2) % n]
+            let y = box.minY + box.height * CGFloat(index) / CGFloat(n - 1)
+            let x = min(box.maxX, max(box.minX, c.x + CGFloat(sample) * box.width * 0.22))
+            if index == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.addLine(to: CGPoint(x: x, y: y)) }
+        }
+        return path
+    }
+
+    static func draw(in context: inout GraphicsContext, frames: [[Float]], energy: CGFloat, box: CGRect, centre c: CGPoint) {
+        // Hot spot.
+        context.drawLayer { glow in
+            glow.addFilter(.blur(radius: 16))
+            let w = 50 + 110 * energy, h = 40 + 80 * energy
+            glow.fill(Path(ellipseIn: CGRect(x: c.x - w / 2, y: c.y - h / 2, width: w, height: h)), with: .color(Color(hex: 0xff3030).opacity(0.25 + 0.35 * energy)))
+            let core = 18 + 60 * energy
+            glow.fill(Path(ellipseIn: CGRect(x: c.x - core / 2, y: c.y - core / 2, width: core, height: core)), with: .color(.white.opacity(0.25 + 0.45 * energy)))
+        }
+        // Trails: older frames larger and fainter, smeared red.
+        context.drawLayer { trail in
+            trail.addFilter(.blur(radius: 6))
+            for (index, frame) in frames.enumerated() {
+                let age = CGFloat(frames.count - 1 - index)
+                guard age > 0 else { continue }
+                let k = 1 + age * 0.07
+                var layer = trail
+                layer.translateBy(x: c.x, y: c.y); layer.scaleBy(x: k, y: k); layer.translateBy(x: -c.x, y: -c.y)
+                let shade = GraphicsContext.Shading.color(Color(hex: 0xff1a1a).opacity(Double(max(0, 1 - age / 11)) * 0.45))
+                layer.stroke(across(frame, box, c), with: shade, lineWidth: 6 / k)
+                layer.stroke(down(frame, box, c), with: shade, lineWidth: 6 / k)
+            }
+        }
+        guard let newest = frames.last else { return }
+        let lines = [across(newest, box, c), down(newest, box, c)]
+        context.drawLayer { smear in
+            smear.addFilter(.blur(radius: 6))
+            for line in lines { smear.stroke(line, with: .color(Color(hex: 0xff2020).opacity(0.75)), lineWidth: 8) }
+        }
+        context.drawLayer { halo in
+            halo.addFilter(.blur(radius: 2))
+            for line in lines { halo.stroke(line, with: .color(Color(hex: 0xff7a7a)), lineWidth: 3.5) }
+        }
+        for line in lines { context.stroke(line, with: .color(.white.opacity(0.95)), lineWidth: 1.1) }
     }
 }
 
@@ -694,7 +618,7 @@ struct LimePlayer: View {
         GeometryReader { proxy in
             let s = min(proxy.size.width / G.width, proxy.size.height / G.height)
             ZStack(alignment: .topLeading) {
-                LimeArtwork(leftOpen: leftOpen, rightOpen: rightOpen).frame(width: G.width * s, height: G.height * s)
+                LimeArtwork(leftOpen: leftOpen, rightOpen: rightOpen).equatable().frame(width: G.width * s, height: G.height * s)
                 screen(s)
                 titlePill(s)
                 headKeys(s)
@@ -754,8 +678,8 @@ struct LimePlayer: View {
         return ZStack(alignment: .topLeading) {
             place(CyberMarquee(text: label, font: .system(size: legible(12 * s, 8), weight: .medium), colour: P.ink)
                 .allowsHitTesting(false), t.midX, t.midY, t.width, t.height, s)
-            place(LimeHit(name: "Show deck A on the head", shape: Circle()) { focusB = false }, G.focusA, 17, s)
-            place(LimeHit(name: "Show deck B on the head", shape: Circle()) { focusB = true }, G.focusB, 17, s)
+            place(LimeHit(name: "Show deck A on the head", shape: Circle()) { focusB = false }, G.focusA, 20, s)
+            place(LimeHit(name: "Show deck B on the head", shape: Circle()) { focusB = true }, G.focusB, 20, s)
             place(LimeHit(name: "Open audio file into deck \(deckName)", shape: Circle()) { deck.openFile(autoplay: false) }, G.openFile, 13, s)
         }
     }
@@ -773,7 +697,7 @@ struct LimePlayer: View {
             place(LimeHit(name: rightOpen ? "Hide playlist" : "Show playlist", shape: RoundedRectangle(cornerRadius: 3 * s)) { rightOpen.toggle() },
                   G.listIcon, 18, s)
             place(LimeHit(name: "Show or hide tracks and imports", shape: RoundedRectangle(cornerRadius: 3 * s), action: showTracks),
-                  G.drawerIcon, 22, s)
+                  G.drawerIcon, 28, s)
         }
     }
 
@@ -990,13 +914,13 @@ struct LimePlayer: View {
                 place(LimeHit(name: "Hide mixer", shape: RoundedRectangle(cornerRadius: 2 * s)) { leftOpen = false }, G.leftWingClose, 13, s)
                 place(LimeHit(name: "Hide mixer", shape: Ellipse()) { leftOpen = false }, 26, 236, 24, 60, s)
             } else {
-                place(LimeHit(name: "Show mixer", shape: Ellipse()) { leftOpen = true }, 334, 236, 22, 70, s)
+                place(LimeHit(name: "Show mixer", shape: Ellipse()) { leftOpen = true }, 318, 236, 16, 70, s)
             }
             if rightOpen {
                 place(LimeHit(name: "Hide playlist", shape: RoundedRectangle(cornerRadius: 2 * s)) { rightOpen = false }, G.rightWingClose, 13, s)
                 place(LimeHit(name: "Hide playlist", shape: Ellipse()) { rightOpen = false }, G.width - 26, 236, 24, 60, s)
             } else {
-                place(LimeHit(name: "Show playlist", shape: Ellipse()) { rightOpen = true }, 606, 236, 22, 70, s)
+                place(LimeHit(name: "Show playlist", shape: Ellipse()) { rightOpen = true }, 610, 236, 16, 70, s)
             }
         }
     }
