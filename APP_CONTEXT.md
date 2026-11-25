@@ -186,8 +186,8 @@ be searched again; selecting a candidate requests its download through normal
 verification, and does not approve its identity or waive quality checks.
 
 `run ID --deep [--index N] [--candidate N]` uses the existing lock, private account
-config, one app-owned loopback Sockseek session, cancellation file and sequential
-worker. A row has at most six sequential fallback queries (45 seconds per command,
+config, one app-owned loopback Sockseek session, cancellation file and parallel
+workers (see below). A row has at most six sequential fallback queries (240 seconds per command,
 eight-second Soulseek search), at most 200 inspected results/query, 20 review
 candidates and three transfer attempts. Logs stop at 8 MB. Queries normalize accents,
 punctuation and spacing; vary artist/title order; focus title; use supplied
@@ -307,7 +307,14 @@ recovery history, import paths and app-owned Sockseek index paths together.
    tracks before requesting new files.
 2. One owned Sockseek daemon runs on `127.0.0.1` for an import and shuts down afterward.
    Keeping a session open avoids repeated reconnections/peer-socket failures seen in
-   the first live test. Search CSV rows individually, with one concurrent job/search.
+   the first live test. Search CSV rows individually (one Sockseek command per row),
+   but run up to `PARALLEL_TRACKS = 5` rows at once (2026-11-25). The daemon is started
+   with `--concurrent-searches 5` (Sockseek's daemon default of 2 otherwise queues
+   them). Its built-in limiter (34 searches / 220 s) still guards against Soulseek's
+   30-minute search ban, so sustained throughput is capped at roughly 9 searches/min;
+   search commands get 240 s so limiter waits are not mistaken for misses. Rows with
+   the same artist/title share one worker lane; job.json writes use `job.lock`; parallel
+   completion hooks wait for the organizer's catalog lock instead of failing.
 3. Filter obvious alternate versions and try up to three exact candidate peers.
    Search hits and nominal bitrates alone do not prove a successful download.
 4. Downloads initially land under `downloads/.incoming/<import-id>/`. The custom Crate

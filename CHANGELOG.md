@@ -762,3 +762,21 @@ rather than reconstruct every past chat message.
 - Validation: `./build-crate` succeeded; check-player (new drop, rejected-drop,
   independent-deck and corrupt-file cases), check-dual-deck and check-skin passed.
   Manual in-app click/drag testing was not performed by the agent.
+
+## 2026-11-25 — Parallel imports: up to five tracks at once
+
+- Imports now search, download and verify up to five tracks at the same time
+  (`PARALLEL_TRACKS` in `crate_backend.py`) instead of one. Each row is still its own
+  Sockseek command with the same quality, duration and identity checks.
+- The app's Sockseek daemon now starts with `--concurrent-searches 5`; its default of 2
+  silently queued parallel searches. Soulseek's ban limiter (34 searches / 220 s) is kept.
+- Safety for parallel work: thread- and process-locked job.json writes, duplicate
+  artist/title rows processed in one lane, completion hooks wait for the catalog lock,
+  `.incomplete` cleanup limited to the track's own folders, one failing row no longer
+  stops the rest. Search timeouts raised to 240 s to cover limiter waits.
+- Stress test (search-only, no downloads, live Soulseek, 42 searches total):
+  daemon default (2 concurrent): 1 → 11.3 s, 3 → 20.7 s, 5 → 33.6 s, 8 → 53.1 s,
+  10 → 63.6 s. Daemon at 10 concurrent: 5 → 18.9 s, 10 → 18.0 s. All 42 searches
+  returned without errors or ban signs.
+- Validation: 45 unit tests passed (5 new in `tests/test_parallel_import.py`). No live
+  download or full in-app import was run.
