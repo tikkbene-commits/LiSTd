@@ -27,7 +27,7 @@ Close other Soulseek clients using that account before signing in or importing.
 ## Skins
 
 Use the **Skin** menu in the toolbar to switch between **Amped · Blue / Red**,
-**Silverwave**, **LiStD · Original**, **Signal · Dual Deck** and **Cyber · Lilac**. Amped recreates the supplied boombox reference:
+**Silverwave**, **LiStD · Original**, **Signal · Dual Deck**, **Cyber · Lilac** and **Limehead · Mix (alpha)**. Amped recreates the supplied boombox reference:
 blue shell, red lettering, chrome controls and black speaker grilles. It is the initial
 skin for new preferences; your choice is saved. Skin changes preserve playback and
 imports. All skins use your supplied ear icon in Finder and the Dock. The speaker
@@ -58,6 +58,30 @@ The top switches mute, minimize and close the window. The side controls lower/ra
 volume. Clicking the left/right speaker seeks backward/forward 10 seconds; the vents
 lower/raise pitch by 1%. Clicking the shell plays/pauses, or opens audio when empty.
 Every control has a tooltip and an accessibility label.
+
+### Limehead · Mix (alpha)
+
+Limehead recreates a supplied green “head” media player, and is an **alpha** skin: it
+works, but its look and controls may still change. It plays **two decks at once**, so the
+library and import lists show **A** / **B** (or **Load A** / **Load B**) buttons.
+
+* **Left wing — mixer.** *Crossfade* blends the decks (all the way left is only deck A,
+  the middle plays both, all the way right is only deck B); *Master* sets the overall
+  level. Under each *DECK* label, five faders: **V** level, **P** pitch (±8%, which also
+  changes tempo), and **L / M / H** low/mid/high cut (top is flat, bottom cuts 24 dB).
+  The small purple button starts or pauses that deck; **reset** returns the crossfader to
+  the centre, levels to 85%, pitch to 1.00 and EQ to flat. Faders also take the arrow keys.
+* **Right wing — playlist.** Lists the collection pane’s current view, filter and sort.
+  Click a row to load it, paused, into the deck named in the box at the top; click that
+  box to switch between deck A and B.
+* **Head.** The gold ◀ and blue ▶ buttons in the title bar choose which deck the screen,
+  title, seek groove and transport (|◀◀ ‖/▶ ■ ▶▶|) control; the ✕ beside them opens an
+  audio file into that deck. The asterisk turns the oscilloscope screen on or off. The
+  bars icon and page icon (and the ✕ / tab on each wing) hide or show the mixer and
+  playlist; the icon under the seek groove opens **Tracks & imports**.
+
+The screen draws jagged white traces from the focused deck’s live audio over red trails.
+There is no shared playback strip, because its volume slider would fight the mixer.
 
 ### Cyber · Lilac
 
@@ -301,6 +325,8 @@ swiftc -parse-as-library native/CrateSkin.swift native/CratePlayer.swift native/
 .music-sorter/build/check-skin
 swiftc -parse-as-library native/CratePlayer.swift native/AudioSpectrum.swift native/CyberSkin.swift tests/check_cyber_player.swift -o .music-sorter/build/check-cyber-player
 .music-sorter/build/check-cyber-player
+swiftc -parse-as-library native/CratePlayer.swift native/AudioSpectrum.swift native/CyberSkin.swift native/Collection.swift native/LimeheadSkin.swift native/LimeheadTrace.swift tests/check_limehead.swift -o .music-sorter/build/check-limehead
+.music-sorter/build/check-limehead
 
 # Playback checks (muted, generated temporary audio; no downloads).
 swiftc -parse-as-library native/CratePlayer.swift native/AudioSpectrum.swift tests/check_crate_player.swift -o .music-sorter/build/check-player

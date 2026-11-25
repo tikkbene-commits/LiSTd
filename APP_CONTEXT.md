@@ -60,7 +60,7 @@ visibility does not recreate playback or cancel imports. Collection selection,
 search, filters and sort live in the root, too.
 
 The six skins are **Amped · Blue / Red**, **Signal · Dual Deck**,
-**Silverwave**, **LiStD · Original**, **Cyber · Lilac** and **Limehead · Mix**. Amped retains its vector boombox, live
+**Silverwave**, **LiStD · Original**, **Cyber · Lilac** and **Limehead · Mix (alpha)**. Amped retains its vector boombox, live
 spectrum, chrome transport, shell/side/speaker/vent actions and vertical pitch
 fader. Player size still controls the artwork's fit within its real player pane.
 Silverwave retains its silver/purple panel and decorative display; Original uses
@@ -79,7 +79,9 @@ no wrap at the ends; previous restarts the song after 3 s; a playing deck keeps 
 or opens a file when the collection view is empty), ■ stop. Screen and field text keep minimum
 legible sizes (9/8/7.5/7 pt) when Player size shrinks the artwork. Cyber keeps the shared
 playback strip and Player size row below the artwork, like Amped.
-Limehead · Mix (`native/LimeheadSkin.swift`) recreates the user-supplied green
+Limehead · Mix (`native/LimeheadSkin.swift`) — **an alpha skin: keep "(alpha)" in
+`CrateSkin.title`, the README and CRATE.md until the user says it is out of alpha** —
+recreates the user-supplied green
 "head" media-player screenshot in the reference crop's own pixel space (934 × 498;
 the geometry still calls the width 935). The head and face, screen outline, both
 wings and all six speakers are traced from the screenshot by
