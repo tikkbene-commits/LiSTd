@@ -364,6 +364,8 @@ struct CrateView: View {
     @StateObject var model = CrateModel()
     @StateObject var player = CratePlayer()
     @StateObject var deckB = CratePlayer()
+    @StateObject var limeMixer = LimeMixer()
+    @State private var limeFocusB = false
     @State private var technicalOpened = false
     @AppStorage("crate.skin") private var skin = CrateSkin.boombox
     @AppStorage("listd.playerSize") private var playerSize = 1.0
@@ -420,12 +422,18 @@ struct CrateView: View {
                 .keyboardShortcut("n", modifiers: .command)
             }
         }
-        .onAppear { model.refresh(); updateDockIcon(); applyAppearance(skin); if skin == .technical { prepareTechnical() } }
-        .onChange(of: skin) { _, value in
+        .onAppear {
+            model.refresh(); updateDockIcon(); applyAppearance(skin)
+            if skin == .technical { prepareTechnical() }
+            if skin == .limehead { limeMixer.attach(player, deckB) }
+        }
+        .onChange(of: skin) { old, value in
             updateDockIcon()
             applyAppearance(value)
+            if old == .limehead { limeMixer.detach() }
             if value == .technical { prepareTechnical() }
-            else if deckB.isPlaying { deckB.toggle() }
+            if value == .limehead { limeMixer.attach(player, deckB) }
+            if !value.isDualDeck, deckB.isPlaying { deckB.toggle() }
         }
         .onChange(of: player.path) { _, _ in if skin == .technical { analyzeDeck(player) } }
         .onChange(of: deckB.path) { _, _ in if skin == .technical { analyzeDeck(deckB) } }
@@ -487,6 +495,7 @@ struct CrateView: View {
             Group {
                 if skin == .boombox { boombox }
                 else if skin == .cyber { cyber }
+                else if skin == .limehead { limehead }
                 else if skin == .silverwave {
                     VStack(spacing: 12) {
                         SilverwaveDisplay(title: player.title, subtitle: player.artist, count: "LiStD · SILVERWAVE")
@@ -505,7 +514,7 @@ struct CrateView: View {
             }
             .contentShape(Rectangle())
             .overlay(RoundedRectangle(cornerRadius: 18).stroke(singleDeckDropTargeted ? skin.accent : .clear, lineWidth: 2))
-            .onDrop(of: [UTType.fileURL.identifier], isTargeted: $singleDeckDropTargeted, perform: player.loadDroppedAudio)
+            .onDrop(of: [UTType.fileURL.identifier], isTargeted: $singleDeckDropTargeted, perform: (skin == .limehead && limeFocusB ? deckB : player).loadDroppedAudio)
         }
     }
 
@@ -566,11 +575,11 @@ struct CrateView: View {
                         Text("\(track.artist.isEmpty ? "Unknown artist" : track.artist) · \(track.genre)")
                             .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }.padding(.vertical, 5).help("\(track.artist) — \(track.title) / \(track.genre)")
-                }.width(max(80, geometry.size.width - (skin == .technical ? 200 : 224)))
+                }.width(max(80, geometry.size.width - (skin.isDualDeck ? 200 : 224)))
                 TableColumn("BPM") { track in Text(track.bpm.map { String(format: "%.1f", $0) } ?? "—").monospacedDigit() }.width(44)
                 TableColumn("Deck") { track in
                     HStack(spacing: 5) {
-                        if skin == .technical {
+                        if skin.isDualDeck {
                             Button("A") { loadDeck(player, track: track) }.help("Load \(track.title) into deck A, paused").accessibilityLabel("Load \(track.title) into deck A")
                             Button("B") { loadDeck(deckB, track: track) }.help("Load \(track.title) into deck B, paused").accessibilityLabel("Load \(track.title) into deck B")
                         } else {
@@ -579,7 +588,7 @@ struct CrateView: View {
                                 .accessibilityLabel("Load \(track.title) into the visible deck")
                         }
                     }.buttonStyle(.bordered).controlSize(.small)
-                }.width(skin == .technical ? 72 : 96)
+                }.width(skin.isDualDeck ? 72 : 96)
             } rows: {
                 ForEach(filtered) { track in
                     TableRow(track).itemProvider { NSItemProvider(object: URL(fileURLWithPath: track.path) as NSURL) }
@@ -673,18 +682,34 @@ struct CrateView: View {
         }.background(LinearGradient(colors: [Color(red: 0.97, green: 0.97, blue: 0.99), Color(red: 0.85, green: 0.86, blue: 0.93)], startPoint: .top, endPoint: .bottom))
     }
 
+    var limehead: some View {
+        VStack(spacing: 8) {
+            GeometryReader { geometry in
+                LimePlayer(a: player, b: deckB, mixer: limeMixer, focusB: $limeFocusB, tracks: browser.visibleTracks,
+                           load: { deck, track in loadDeck(deck, track: track); technicalSelection = track.id },
+                           step: { deck, offset, autoplay in stepCollection(deck, offset, autoplay: autoplay) },
+                           showTracks: { showWorkspace.toggle() })
+                    .frame(width: geometry.size.width * playerSize, height: geometry.size.height * playerSize)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+            }.frame(minHeight: 240).clipped()
+            playerSizeControls
+        }.background(LinearGradient(colors: [Color(red: 0.62, green: 0.75, blue: 0.89), Color(red: 0.42, green: 0.60, blue: 0.80)], startPoint: .top, endPoint: .bottom))
+    }
+
     /// Previous/next for single-deck skins: steps through the collection pane in its
     /// current filter and sort. Previous restarts the song after 3 seconds of play.
-    func stepCollection(_ offset: Int, autoplay: Bool) {
-        player.updatePosition()
-        if offset < 0, player.loaded, player.position > 3 { player.seek(to: 0); return }
-        guard let track = browser.neighbour(of: player.path, offset: offset) else {
-            if offset < 0, player.loaded { player.seek(to: 0) }
+    func stepCollection(_ offset: Int, autoplay: Bool) { stepCollection(player, offset, autoplay: autoplay) }
+
+    func stepCollection(_ deck: CratePlayer, _ offset: Int, autoplay: Bool) {
+        deck.updatePosition()
+        if offset < 0, deck.loaded, deck.position > 3 { deck.seek(to: 0); return }
+        guard let track = browser.neighbour(of: deck.path, offset: offset) else {
+            if offset < 0, deck.loaded { deck.seek(to: 0) }
             return
         }
-        player.play(path: track.path, title: track.title, artist: track.artist, autoplay: autoplay, bpm: track.bpm)
+        deck.play(path: track.path, title: track.title, artist: track.artist, autoplay: autoplay, bpm: track.bpm)
         technicalSelection = track.id
-        analyzeDeck(player)
+        analyzeDeck(deck)
     }
 
     var importView: some View {
@@ -814,8 +839,8 @@ struct CrateView: View {
                     Text(track.note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 8)], alignment: .leading, spacing: 8) {
                         if ["ready", "existing"].contains(track.status), !track.path.isEmpty {
-                            Button(skin == .technical ? "Load A" : "Load track") { player.play(path: track.path, title: track.title, artist: track.artist, autoplay: false, bpm: track.bpm) }
-                            if skin == .technical {
+                            Button(skin.isDualDeck ? "Load A" : "Load track") { player.play(path: track.path, title: track.title, artist: track.artist, autoplay: false, bpm: track.bpm) }
+                            if skin.isDualDeck {
                                 Button("Load B") { deckB.play(path: track.path, title: track.title, artist: track.artist, autoplay: false, bpm: track.bpm) }
                             }
                             Button("Show in Finder") { model.reveal(track.path) }
